@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { toPng } from 'html-to-image';
+import { Analytics } from '@vercel/analytics/react';
 
 // ──────────────────────────────────────────────────────────────
 // Design tokens
@@ -1011,19 +1012,27 @@ export default function App() {
   if (loading) return <PWLoadingScreen />;
 
   if (isMobile) {
-    return food
-      ? <PWResultScreen food={food} onScanAgain={onScanAgain} />
-      : <PWInputScreen state={state} setState={setState} onAnalyze={onAnalyze} error={error} />;
+    return (
+      <>
+        {food
+          ? <PWResultScreen food={food} onScanAgain={onScanAgain} />
+          : <PWInputScreen state={state} setState={setState} onAnalyze={onAnalyze} error={error} />}
+        <Analytics />
+      </>
+    );
   }
 
   return (
-    <PWDesktopView
-      state={state}
-      setState={setState}
-      food={food}
-      onAnalyze={onAnalyze}
-      onScanAgain={onScanAgain}
-      error={error}
-    />
+    <>
+      <PWDesktopView
+        state={state}
+        setState={setState}
+        food={food}
+        onAnalyze={onAnalyze}
+        onScanAgain={onScanAgain}
+        error={error}
+      />
+      <Analytics />
+    </>
   );
 }
