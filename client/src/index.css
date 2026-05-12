@@ -1,0 +1,173 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(1000px 600px at 12% -10%, #EFEAE0 0%, transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, #E6EFE8 0%, transparent 60%),
+    #ECE9E2;
+  color: #171513;
+  min-height: 100vh;
+  overflow-x: auto;
+}
+@keyframes pwFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pwScaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes pwChipIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Animated aurora background ── */
+.pw-aurora {
+  position: absolute;
+  width: 360px; height: 360px;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.28;
+  mix-blend-mode: multiply;
+  will-change: transform;
+}
+.pw-aurora-1 { top: -120px; left: -100px; animation: pwAurora1 18s ease-in-out infinite; }
+.pw-aurora-2 { top: 30%; right: -140px; animation: pwAurora2 22s ease-in-out infinite; opacity: 0.32; }
+.pw-aurora-3 { bottom: -120px; left: 20%; animation: pwAurora3 26s ease-in-out infinite; opacity: 0.24; }
+.pw-aurora-4 { top: 60%; left: -100px; animation: pwAurora1 30s ease-in-out infinite; opacity: 0.22; }
+@keyframes pwAurora1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(80px, 60px) scale(1.15); }
+  66% { transform: translate(40px, -40px) scale(0.92); }
+}
+@keyframes pwAurora2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-100px, 80px) scale(1.2); }
+}
+@keyframes pwAurora3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(60px, -80px) scale(1.1); }
+  70% { transform: translate(-50px, -30px) scale(0.95); }
+}
+
+/* ── Drifting decorative glyphs ── */
+.pw-drift {
+  position: absolute;
+  font-size: 22px;
+  opacity: 0.18;
+  filter: saturate(0.6);
+  will-change: transform;
+  pointer-events: none;
+}
+.pw-drift-1 { top: 12%; left: 8%;  animation: pwDriftA 14s ease-in-out infinite; font-size: 26px; }
+.pw-drift-2 { top: 22%; right: 12%; animation: pwDriftB 17s ease-in-out infinite; font-size: 18px; opacity: 0.32; }
+.pw-drift-3 { bottom: 26%; left: 14%; animation: pwDriftC 20s ease-in-out infinite; font-size: 20px; opacity: 0.14; }
+.pw-drift-4 { bottom: 18%; right: 18%; animation: pwDriftA 23s ease-in-out infinite; font-size: 24px; opacity: 0.16; }
+.pw-drift-5 { top: 50%; left: 48%; animation: pwDriftB 12s ease-in-out infinite; font-size: 30px; opacity: 0.10; color: #888; }
+@keyframes pwDriftA {
+  0%, 100% { transform: translate(0,0) rotate(0deg); }
+  50% { transform: translate(20px, -30px) rotate(15deg); }
+}
+@keyframes pwDriftB {
+  0%, 100% { transform: translate(0,0) rotate(0deg); }
+  50% { transform: translate(-25px, 30px) rotate(-12deg); }
+}
+@keyframes pwDriftC {
+  0%, 100% { transform: translate(0,0) rotate(0deg); }
+  50% { transform: translate(30px, 20px) rotate(8deg); }
+}
+
+/* ── Subtle grain ── */
+.pw-grain {
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(rgba(20,16,12,0.04) 1px, transparent 1px);
+  background-size: 3px 3px;
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ── Pulsing dot ── */
+.pw-pulse-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  animation: pwDotPulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 0 0 currentColor;
+}
+@keyframes pwDotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+  50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+}
+
+/* ── Sparkle gentle spin ── */
+.pw-sparkle-spin { animation: pwSparkleSpin 6s ease-in-out infinite; transform-origin: center; }
+@keyframes pwSparkleSpin {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.12) rotate(20deg); }
+}
+
+/* ── Wave hand ── */
+.pw-wave { display: inline-block; animation: pwWave 2.4s ease-in-out infinite; transform-origin: 70% 70%; }
+@keyframes pwWave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  30% { transform: rotate(14deg); }
+  40% { transform: rotate(-4deg); }
+  50% { transform: rotate(10deg); }
+}
+
+/* ── Heart beat ── */
+.pw-heart { display: inline-block; animation: pwHeart 1.6s ease-in-out infinite; }
+@keyframes pwHeart {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.25); }
+  30% { transform: scale(1); }
+  45% { transform: scale(1.18); }
+}
+
+/* ── Typing caret ── */
+.pw-caret { animation: pwCaret 1.1s steps(2) infinite; margin-left: 1px; opacity: 0.5; font-weight: 300; }
+@keyframes pwCaret { 50% { opacity: 0; } }
+
+/* ── CTA shine sweep ── */
+.pw-shine {
+  position: absolute; top: 0; left: -40%; width: 30%; height: 100%;
+  background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+  animation: pwShine 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes pwShine {
+  0% { left: -40%; }
+  40%, 100% { left: 130%; }
+}
+
+/* ── Analyze button ready glow ── */
+.pw-cta-pulse {
+  animation: pwCtaPulse 2.4s ease-in-out infinite;
+}
+@keyframes pwCtaPulse {
+  0%, 100% { box-shadow: 0 6px 20px rgba(20,16,12,0.18), 0 0 0 0 rgba(20,16,12,0.0); }
+  50% { box-shadow: 0 6px 20px rgba(20,16,12,0.22), 0 0 0 8px rgba(20,16,12,0.04); }
+}
+
+.pw-analyze-glow {
+  animation: pwAnalyzeGlow 1.8s ease-in-out infinite;
+}
+@keyframes pwAnalyzeGlow {
+  0%, 100% { box-shadow: 0 6px 20px rgba(34,197,94,0.28), 0 0 0 0 rgba(34,197,94,0); }
+  50% { box-shadow: 0 6px 24px rgba(34,197,94,0.45), 0 0 0 6px rgba(34,197,94,0.10); }
+}
+
+/* ── Page-level ambient blobs (behind frames) ── */
+.pw-page-blob {
+  position: fixed; width: 800px; height: 800px;
+  border-radius: 50%; filter: blur(120px);
+  pointer-events: none; z-index: 0;
+  mix-blend-mode: multiply;
+}
+.pw-page-blob.a { background: #B7E2C4; top: -200px; left: -200px; opacity: 0.35; animation: pwAurora1 30s ease-in-out infinite; }
+.pw-page-blob.b { background: #FFE3B0; bottom: -200px; right: -200px; opacity: 0.30; animation: pwAurora2 36s ease-in-out infinite; }
+.pw-page-blob.c { background: #FFC9D1; top: 30%; right: 10%; opacity: 0.18; animation: pwAurora3 40s ease-in-out infinite; }
