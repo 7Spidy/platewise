@@ -23,34 +23,71 @@ const PW_TOKENS = {
   shadowSoft: '0 1px 2px rgba(20,16,12,0.04), 0 4px 16px rgba(20,16,12,0.04)',
 };
 
-// Suggestion chip labels for the input screen
 const DEMO_CHIPS = ['Butter Chicken', 'Avocado Toast', 'Caesar Salad'];
 
 // ──────────────────────────────────────────────────────────────
-// Image compression utility
+// Image compression — 600px max, always JPEG, with error handling
 // ──────────────────────────────────────────────────────────────
-function compressImage(file, maxPx = 800) {
-  return new Promise((resolve) => {
+function compressImage(file, maxPx = 600) {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Could not read image. The file may be corrupt or an unsupported format.'));
+    };
+
     img.onload = () => {
       URL.revokeObjectURL(url);
       let { width, height } = img;
       if (width > maxPx || height > maxPx) {
         const ratio = Math.min(maxPx / width, maxPx / height);
-        width = Math.round(width * ratio);
+        width  = Math.round(width  * ratio);
         height = Math.round(height * ratio);
       }
       const canvas = document.createElement('canvas');
-      canvas.width = width;
+      canvas.width  = width;
       canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      const mimeType = file.type || 'image/jpeg';
-      const base64 = canvas.toDataURL(mimeType, 0.85).split(',')[1];
+      // Always encode as JPEG — handles HEIC/HEIF and exotic formats safely
+      const base64   = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      const mimeType = 'image/jpeg';
       resolve({ base64, mimeType });
     };
+
     img.src = url;
   });
+}
+
+// ──────────────────────────────────────────────────────────────
+// PNG export hook — shared by mobile and desktop result screens
+// ──────────────────────────────────────────────────────────────
+function usePngExport(cardRef, food) {
+  const [toast, setToast] = useState(null);
+
+  const onDownload = async () => {
+    if (!cardRef.current || !food) return;
+    const filename = `platewise-${food.name.toLowerCase().replace(/\s+/g, '-')}.png`;
+    try {
+      const dataUrl = await toPng(cardRef.current, {
+        cacheBust: true,
+        backgroundColor: '#FFFFFF',
+        pixelRatio: 2,
+        filter: (node) => !(node.classList && node.classList.contains('pw-no-export')),
+      });
+      const link    = document.createElement('a');
+      link.download = filename;
+      link.href     = dataUrl;
+      link.click();
+      setToast('Downloaded · ' + filename);
+    } catch (e) {
+      setToast('Download failed: ' + e.message);
+    }
+    setTimeout(() => setToast(null), 2400);
+  };
+
+  return { onDownload, toast };
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -113,27 +150,6 @@ function PWBrand({ size = 22, color = PW_TOKENS.ink, animated = false }) {
         fontFamily: 'Inter, system-ui', fontWeight: 600, fontSize: size,
         letterSpacing: -0.4, color, lineHeight: 1,
       }}>Platewise</span>
-    </div>
-  );
-}
-
-// ──────────────────────────────────────────────────────────────
-// Food image placeholder
-// ──────────────────────────────────────────────────────────────
-function PWFoodImage({ size = 120, label = 'food photo' }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: 16, position: 'relative',
-      overflow: 'hidden', flexShrink: 0,
-      background: 'repeating-linear-gradient(135deg, #F1ECE3 0 10px, #EDE6D9 10px 20px)',
-      border: `1px solid ${PW_TOKENS.line}`,
-    }}>
-      <div style={{
-        position: 'absolute', inset: 0, display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-        fontSize: 10, color: '#A89A82', letterSpacing: 0.5,
-      }}>{label}</div>
     </div>
   );
 }
@@ -212,17 +228,23 @@ function usePWRotatingPlaceholder(items, intervalMs = 2400) {
 // ──────────────────────────────────────────────────────────────
 function PWInputScreen({ state, setState, onAnalyze, accent = PW_TOKENS.green, error }) {
   const inputRef = useRef(null);
-  const fileRef = useRef(null);
+  const fileRef  = useRef(null);
   const placeholders = ['e.g. Butter Chicken', 'e.g. Avocado Toast', 'e.g. Caesar Salad', 'e.g. Cold brew + oat milk', 'e.g. Margherita pizza'];
-  const ph = usePWRotatingPlaceholder(placeholders, 2600);
+  const ph    = usePWRotatingPlaceholder(placeholders, 2600);
   const ready = state.foodName && state.imageBase64;
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
     const preview = URL.createObjectURL(f);
-    const { base64, mimeType } = await compressImage(f);
-    setState((s) => ({ ...s, photo: preview, imageBase64: base64, mimeType }));
+    try {
+      const { base64, mimeType } = await compressImage(f);
+      setState((s) => ({ ...s, photo: preview, imageBase64: base64, mimeType }));
+    } catch (err) {
+      URL.revokeObjectURL(preview);
+      setState((s) => ({ ...s, photo: null, imageBase64: null }));
+      console.error('Image load error:', err.message);
+    }
   };
 
   return (
@@ -234,192 +256,194 @@ function PWInputScreen({ state, setState, onAnalyze, accent = PW_TOKENS.green, e
     }}>
       <PWAuroraBackground accent={accent} />
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 28, flex: 1 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <PWBrand size={26} animated />
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)',
-            border: `1px solid ${PW_TOKENS.line}`,
-            padding: '5px 10px 5px 8px', borderRadius: 999,
-            fontSize: 11.5, fontWeight: 500, color: PW_TOKENS.inkSoft, letterSpacing: -0.1,
-          }}>
-            <span className="pw-pulse-dot" style={{ background: accent }}></span>
-            Ready to scan
-          </div>
-        </div>
-        <p style={{
-          margin: 0, fontSize: 16, lineHeight: 1.5,
-          color: PW_TOKENS.inkSoft, fontWeight: 400, letterSpacing: -0.1,
-        }}>Scan any food. <span style={{ color: PW_TOKENS.ink }}>Know what's inside.</span></p>
-      </div>
 
-      {/* Input field */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <label style={{
-          fontSize: 13, fontWeight: 500, color: PW_TOKENS.inkSoft,
-          letterSpacing: 0.2, textTransform: 'uppercase',
-        }}>Food name</label>
-        <div style={{
-          background: '#fff', border: `1px solid ${PW_TOKENS.line}`,
-          borderRadius: 16, padding: '16px 18px',
-          boxShadow: PW_TOKENS.shadowSoft,
-          display: 'flex', alignItems: 'center', gap: 10,
-        }}>
-          <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minHeight: 24 }}>
-            <input
-              ref={inputRef}
-              value={state.foodName}
-              onChange={(e) => setState((s) => ({ ...s, foodName: e.target.value }))}
-              placeholder=""
-              style={{
-                flex: 1, width: '100%', border: 'none', outline: 'none', background: 'transparent',
-                fontFamily: 'inherit', fontSize: 17, color: PW_TOKENS.ink,
-                letterSpacing: -0.2, position: 'relative', zIndex: 1,
-              }}
-            />
-            {!state.foodName && (
-              <span
-                key={ph.text}
+        {/* Header */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <PWBrand size={26} animated />
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)',
+              border: `1px solid ${PW_TOKENS.line}`,
+              padding: '5px 10px 5px 8px', borderRadius: 999,
+              fontSize: 11.5, fontWeight: 500, color: PW_TOKENS.inkSoft, letterSpacing: -0.1,
+            }}>
+              <span className="pw-pulse-dot" style={{ background: accent }}></span>
+              Ready to scan
+            </div>
+          </div>
+          <p style={{
+            margin: 0, fontSize: 16, lineHeight: 1.5,
+            color: PW_TOKENS.inkSoft, fontWeight: 400, letterSpacing: -0.1,
+          }}>Scan any food. <span style={{ color: PW_TOKENS.ink }}>Know what's inside.</span></p>
+        </div>
+
+        {/* Input field */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{
+            fontSize: 13, fontWeight: 500, color: PW_TOKENS.inkSoft,
+            letterSpacing: 0.2, textTransform: 'uppercase',
+          }}>Food name</label>
+          <div style={{
+            background: '#fff', border: `1px solid ${PW_TOKENS.line}`,
+            borderRadius: 16, padding: '16px 18px',
+            boxShadow: PW_TOKENS.shadowSoft,
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minHeight: 24 }}>
+              <input
+                ref={inputRef}
+                value={state.foodName}
+                onChange={(e) => setState((s) => ({ ...s, foodName: e.target.value }))}
+                placeholder=""
+                maxLength={80}
                 style={{
-                  position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-                  fontSize: 17, color: PW_TOKENS.inkMute, letterSpacing: -0.2,
-                  pointerEvents: 'none',
-                  opacity: ph.phase === 'in' ? 1 : 0,
-                  transition: 'opacity 0.28s ease, transform 0.28s ease',
-                }}>{ph.text}<span className="pw-caret">|</span></span>
+                  flex: 1, width: '100%', border: 'none', outline: 'none', background: 'transparent',
+                  fontFamily: 'inherit', fontSize: 17, color: PW_TOKENS.ink,
+                  letterSpacing: -0.2, position: 'relative', zIndex: 1,
+                }}
+              />
+              {!state.foodName && (
+                <span
+                  key={ph.text}
+                  style={{
+                    position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                    fontSize: 17, color: PW_TOKENS.inkMute, letterSpacing: -0.2,
+                    pointerEvents: 'none',
+                    opacity: ph.phase === 'in' ? 1 : 0,
+                    transition: 'opacity 0.28s ease, transform 0.28s ease',
+                  }}>{ph.text}<span className="pw-caret">|</span></span>
+              )}
+            </div>
+            {state.foodName && (
+              <button onClick={() => setState((s) => ({ ...s, foodName: '' }))}
+                style={{
+                  width: 22, height: 22, borderRadius: 11, border: 'none',
+                  background: PW_TOKENS.line, color: PW_TOKENS.inkSoft, cursor: 'pointer',
+                  fontSize: 14, lineHeight: 1, padding: 0,
+                }}>×</button>
             )}
           </div>
-          {state.foodName && (
-            <button onClick={() => setState((s) => ({ ...s, foodName: '' }))}
-              style={{
-                width: 22, height: 22, borderRadius: 11, border: 'none',
-                background: PW_TOKENS.line, color: PW_TOKENS.inkSoft, cursor: 'pointer',
-                fontSize: 14, lineHeight: 1, padding: 0,
-              }}>×</button>
-          )}
-        </div>
-        {/* Suggestions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-          <span style={{
-            fontSize: 11, color: PW_TOKENS.inkMute, fontWeight: 500,
-            letterSpacing: 0.5, textTransform: 'uppercase',
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-          }}>
-            <span className="pw-wave">👋</span> try one
-          </span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {DEMO_CHIPS.map((f, i) => (
-              <button key={f} onClick={() => setState((s) => ({ ...s, foodName: f }))}
-                style={{
-                  background: state.foodName === f ? PW_TOKENS.greenSoft : 'rgba(255,255,255,0.85)',
-                  border: `1px solid ${state.foodName === f ? accent : PW_TOKENS.line}`,
-                  color: state.foodName === f ? PW_TOKENS.greenInk : PW_TOKENS.inkSoft,
-                  fontSize: 12.5, padding: '6px 11px', borderRadius: 999, cursor: 'pointer',
-                  fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s',
-                  backdropFilter: 'blur(6px)',
-                  animation: `pwChipIn 0.4s ${0.1 + i * 0.08}s both`,
-                }}>{f}</button>
-            ))}
+          {/* Suggestions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 11, color: PW_TOKENS.inkMute, fontWeight: 500,
+              letterSpacing: 0.5, textTransform: 'uppercase',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}>
+              <span className="pw-wave">👋</span> try one
+            </span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {DEMO_CHIPS.map((f, i) => (
+                <button key={f} onClick={() => setState((s) => ({ ...s, foodName: f }))}
+                  style={{
+                    background: state.foodName === f ? PW_TOKENS.greenSoft : 'rgba(255,255,255,0.85)',
+                    border: `1px solid ${state.foodName === f ? accent : PW_TOKENS.line}`,
+                    color: state.foodName === f ? PW_TOKENS.greenInk : PW_TOKENS.inkSoft,
+                    fontSize: 12.5, padding: '6px 11px', borderRadius: 999, cursor: 'pointer',
+                    fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s',
+                    backdropFilter: 'blur(6px)',
+                    animation: `pwChipIn 0.4s ${0.1 + i * 0.08}s both`,
+                  }}>{f}</button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Primary CTA - photo upload */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
-        <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
-        <button onClick={() => fileRef.current?.click()}
-          className={!state.photo && state.foodName ? 'pw-cta-pulse' : ''}
-          style={{
-            background: PW_TOKENS.ink, color: '#fff', border: 'none',
-            borderRadius: 999, padding: '18px 24px',
-            fontFamily: 'inherit', fontSize: 16, fontWeight: 600, letterSpacing: -0.1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            cursor: 'pointer', boxShadow: '0 6px 20px rgba(20,16,12,0.18)',
-            position: 'relative', overflow: 'hidden',
+        {/* Primary CTA — photo upload */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
+          <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+          <button onClick={() => fileRef.current?.click()}
+            className={!state.photo && state.foodName ? 'pw-cta-pulse' : ''}
+            style={{
+              background: PW_TOKENS.ink, color: '#fff', border: 'none',
+              borderRadius: 999, padding: '18px 24px',
+              fontFamily: 'inherit', fontSize: 16, fontWeight: 600, letterSpacing: -0.1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              cursor: 'pointer', boxShadow: '0 6px 20px rgba(20,16,12,0.18)',
+              position: 'relative', overflow: 'hidden',
+            }}>
+            <span className="pw-shine"></span>
+            {PWIcon.camera(20)}
+            <span>Take Photo or Upload</span>
+          </button>
+          <p style={{
+            margin: 0, fontSize: 13, color: PW_TOKENS.inkMute, textAlign: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}>
-          <span className="pw-shine"></span>
-          {PWIcon.camera(20)}
-          <span>Take Photo or Upload</span>
-        </button>
-        <p style={{
-          margin: 0, fontSize: 13, color: PW_TOKENS.inkMute, textAlign: 'center',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}>
-          {PWIcon.gallery(14, PW_TOKENS.inkMute)}
-          Works with camera or gallery
-        </p>
-      </div>
+            {PWIcon.gallery(14, PW_TOKENS.inkMute)}
+            Works with camera or gallery
+          </p>
+        </div>
 
-      {/* Photo preview + analyze */}
-      {state.photo && (
-        <div style={{
-          display: 'flex', flexDirection: 'column', gap: 16,
-          padding: 20, background: '#fff', borderRadius: 20,
-          border: `1px solid ${PW_TOKENS.line}`, boxShadow: PW_TOKENS.shadowSoft,
-          animation: 'pwFadeUp 0.4s ease',
-        }}>
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-            <div style={{ position: 'relative' }}>
-              <img src={state.photo} alt="" style={{
-                width: 120, height: 120, borderRadius: 16, objectFit: 'cover',
-                border: `1px solid ${PW_TOKENS.line}`,
-              }} />
-              <div style={{
-                position: 'absolute', bottom: -6, right: -6,
-                width: 30, height: 30, borderRadius: 15, background: accent,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 3px 10px rgba(34,197,94,0.35)',
-                border: '2.5px solid #fff',
-              }}>{PWIcon.check(14)}</div>
-            </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: PW_TOKENS.ink }}>Photo ready</div>
-              <div style={{ fontSize: 13, color: PW_TOKENS.inkSoft, lineHeight: 1.4 }}>
-                {state.foodName ? `"${state.foodName}"` : 'No food name yet'} —{' '}
-                tap analyze to see the breakdown.
+        {/* Photo preview + analyze */}
+        {state.photo && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 16,
+            padding: 20, background: '#fff', borderRadius: 20,
+            border: `1px solid ${PW_TOKENS.line}`, boxShadow: PW_TOKENS.shadowSoft,
+            animation: 'pwFadeUp 0.4s ease',
+          }}>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              <div style={{ position: 'relative' }}>
+                <img src={state.photo} alt="" style={{
+                  width: 120, height: 120, borderRadius: 16, objectFit: 'cover',
+                  border: `1px solid ${PW_TOKENS.line}`,
+                }} />
+                <div style={{
+                  position: 'absolute', bottom: -6, right: -6,
+                  width: 30, height: 30, borderRadius: 15, background: accent,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 3px 10px rgba(34,197,94,0.35)',
+                  border: '2.5px solid #fff',
+                }}>{PWIcon.check(14)}</div>
+              </div>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: PW_TOKENS.ink }}>Photo ready</div>
+                <div style={{ fontSize: 13, color: PW_TOKENS.inkSoft, lineHeight: 1.4 }}>
+                  {state.foodName ? `"${state.foodName}"` : 'No food name yet'} —{' '}
+                  tap analyze to see the breakdown.
+                </div>
               </div>
             </div>
+            <button onClick={onAnalyze} disabled={!state.foodName || !state.imageBase64}
+              className={ready ? 'pw-analyze-glow' : ''}
+              style={{
+                background: ready ? accent : '#D9D6D1',
+                color: '#fff', border: 'none', borderRadius: 999,
+                padding: '16px 24px', fontFamily: 'inherit',
+                fontSize: 16, fontWeight: 600, letterSpacing: -0.1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                cursor: ready ? 'pointer' : 'not-allowed',
+                boxShadow: ready ? '0 6px 20px rgba(34,197,94,0.28)' : 'none',
+                transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
+              }}>
+              <span style={{ position: 'relative', zIndex: 1 }}>Analyze</span>
+              <span style={{ position: 'relative', zIndex: 1, display: 'inline-flex' }}>{PWIcon.arrow(16)}</span>
+            </button>
           </div>
-          <button onClick={onAnalyze} disabled={!state.foodName || !state.imageBase64}
-            className={ready ? 'pw-analyze-glow' : ''}
-            style={{
-              background: ready ? accent : '#D9D6D1',
-              color: '#fff', border: 'none', borderRadius: 999,
-              padding: '16px 24px', fontFamily: 'inherit',
-              fontSize: 16, fontWeight: 600, letterSpacing: -0.1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              cursor: ready ? 'pointer' : 'not-allowed',
-              boxShadow: ready ? '0 6px 20px rgba(34,197,94,0.28)' : 'none',
-              transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
-            }}>
-            <span style={{ position: 'relative', zIndex: 1 }}>Analyze</span>
-            <span style={{ position: 'relative', zIndex: 1, display: 'inline-flex' }}>{PWIcon.arrow(16)}</span>
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* Error banner */}
-      {error && (
+        {/* Error banner */}
+        {error && (
+          <div style={{
+            background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 12,
+            padding: '12px 14px', fontSize: 13, color: '#991B1B',
+          }}>⚠ {error}</div>
+        )}
+
+        <div style={{ flex: 1 }}></div>
+
+        {/* Footer */}
         <div style={{
-          background: '#FEE2E2', border: '1px solid #FCA5A5', borderRadius: 12,
-          padding: '12px 14px', fontSize: 13, color: '#991B1B',
-        }}>⚠ {error}</div>
-      )}
-
-      <div style={{ flex: 1 }}></div>
-
-      {/* Footer */}
-      <div style={{
-        textAlign: 'center', fontSize: 11.5, color: PW_TOKENS.inkMute,
-        letterSpacing: 0.3, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', gap: 6,
-      }}>
-        <span>Powered by AI, made with</span>
-        <span className="pw-heart" style={{ color: '#E25555', fontSize: 12 }}>♥</span>
-        <span>by Avi</span>
-      </div>
+          textAlign: 'center', fontSize: 11.5, color: PW_TOKENS.inkMute,
+          letterSpacing: 0.3, display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 6,
+        }}>
+          <span>Powered by AI, made with</span>
+          <span className="pw-heart" style={{ color: '#E25555', fontSize: 12 }}>♥</span>
+          <span>by Avi</span>
+        </div>
       </div>
     </div>
   );
@@ -460,21 +484,26 @@ function PWScoreBadge({ score = 7, size = 64 }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// Macro stacked bar
+// Macro stacked bar — zero-guard prevents NaN and collapsed segments
 // ──────────────────────────────────────────────────────────────
 function PWMacroBar({ carbs, protein, fat }) {
-  const total = carbs + protein + fat;
+  const total     = carbs + protein + fat;
+  const safeTotal = total || 1; // prevents 0/0 = NaN in percentage labels
   const segs = [
-    { label: 'Carbs', value: carbs, color: PW_TOKENS.carbs },
+    { label: 'Carbs',   value: carbs,   color: PW_TOKENS.carbs },
     { label: 'Protein', value: protein, color: PW_TOKENS.protein },
-    { label: 'Fat', value: fat, color: PW_TOKENS.fat },
+    { label: 'Fat',     value: fat,     color: PW_TOKENS.fat },
   ];
+  // Minimum visual flex of 2% of total so zero-value segments don't collapse the bar
+  const flexFor = (v) => Math.max(v, safeTotal * 0.02);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', width: '100%' }}>
         {segs.map((s, i) => (
           <div key={s.label} style={{
-            flex: s.value, display: 'flex', flexDirection: 'column',
+            flex: flexFor(s.value),
+            display: 'flex', flexDirection: 'column',
             alignItems: i === 0 ? 'flex-start' : i === segs.length - 1 ? 'flex-end' : 'center',
             gap: 2,
           }}>
@@ -494,7 +523,7 @@ function PWMacroBar({ carbs, protein, fat }) {
       }}>
         {segs.map((s, i) => (
           <div key={s.label} style={{
-            flex: s.value, background: s.color,
+            flex: flexFor(s.value), background: s.color,
             borderRight: i < segs.length - 1 ? '2px solid #fff' : 'none',
           }}/>
         ))}
@@ -502,10 +531,10 @@ function PWMacroBar({ carbs, protein, fat }) {
       <div style={{ display: 'flex', width: '100%' }}>
         {segs.map((s, i) => (
           <div key={s.label} style={{
-            flex: s.value,
+            flex: flexFor(s.value),
             textAlign: i === 0 ? 'left' : i === segs.length - 1 ? 'right' : 'center',
             fontSize: 11, color: PW_TOKENS.inkMute, fontWeight: 500,
-          }}>{Math.round((s.value / total) * 100)}%</div>
+          }}>{Math.round((s.value / safeTotal) * 100)}%</div>
         ))}
       </div>
     </div>
@@ -565,6 +594,18 @@ function PWResultCard({ food, onScanAgain, onDownload, accent = PW_TOKENS.green,
         <PWScoreBadge score={food.score} size={64} />
       </div>
 
+      {/* Mismatch warning — shown when model flags photo/name mismatch */}
+      {food.mismatch && (
+        <div style={{
+          background: '#FEF3C7', border: '1px solid #F59E0B', borderRadius: 12,
+          padding: '10px 14px', fontSize: 13, color: '#92400E',
+          display: 'flex', alignItems: 'center', gap: 8, lineHeight: 1.45,
+        }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+          <span>The photo may not match <strong>"{food.name}"</strong> — nutrition estimate may be less accurate.</span>
+        </div>
+      )}
+
       {/* Hero calorie display */}
       <div style={{
         background: PW_TOKENS.bg, borderRadius: 18, padding: '20px 22px',
@@ -583,7 +624,8 @@ function PWResultCard({ food, onScanAgain, onDownload, accent = PW_TOKENS.green,
         <div style={{ flex: 1 }}></div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
           <span style={{ fontSize: 10.5, color: PW_TOKENS.inkMute, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase' }}>Energy</span>
-          <span style={{ fontSize: 12, color: PW_TOKENS.inkSoft, fontWeight: 500 }}>≈ {Math.round(food.kcal / 90)} min run</span>
+          {/* ÷10 = approx kcal/min at a moderate running pace */}
+          <span style={{ fontSize: 12, color: PW_TOKENS.inkSoft, fontWeight: 500 }}>≈ {Math.round(food.kcal / 10)} min run</span>
         </div>
       </div>
 
@@ -594,8 +636,8 @@ function PWResultCard({ food, onScanAgain, onDownload, accent = PW_TOKENS.green,
 
       {/* Micro pills */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <PWMicroPill icon="🌿" label="Fiber" value={food.fiber} unit="g" />
-        <PWMicroPill icon="🍬" label="Sugar" value={food.sugar} unit="g" />
+        <PWMicroPill icon="🌿" label="Fiber"  value={food.fiber}  unit="g"  />
+        <PWMicroPill icon="🍬" label="Sugar"  value={food.sugar}  unit="g"  />
         <PWMicroPill icon="🧂" label="Sodium" value={food.sodium} unit="mg" />
       </div>
 
@@ -657,7 +699,7 @@ function PWResultCard({ food, onScanAgain, onDownload, accent = PW_TOKENS.green,
         </span>
       </div>
 
-      {/* Action buttons — excluded from PNG capture via pw-no-export */}
+      {/* Action buttons — excluded from PNG capture */}
       <div className="pw-no-export" style={{ display: 'flex', gap: 10, marginTop: 4 }}>
         <button onClick={onDownload} style={{
           flex: 1, background: '#fff', color: PW_TOKENS.ink,
@@ -682,31 +724,12 @@ function PWResultCard({ food, onScanAgain, onDownload, accent = PW_TOKENS.green,
 }
 
 // ──────────────────────────────────────────────────────────────
-// SCREEN 2 wrapper for mobile
+// SCREEN 2 wrapper for mobile — uses shared usePngExport hook
 // ──────────────────────────────────────────────────────────────
 function PWResultScreen({ food, onScanAgain, accent = PW_TOKENS.green }) {
-  const [toast, setToast] = useState(null);
-  const cardRef = useRef(null);
-  const onDownload = async () => {
-    if (!cardRef.current) return;
-    const filename = `platewise-${food.name.toLowerCase().replace(/\s+/g, '-')}.png`;
-    try {
-      const dataUrl = await toPng(cardRef.current, {
-        cacheBust: true,
-        backgroundColor: '#FFFFFF',
-        pixelRatio: 2,
-        filter: (node) => !(node.classList && node.classList.contains('pw-no-export')),
-      });
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
-      setToast('Downloaded · ' + filename);
-    } catch (e) {
-      setToast('Download failed: ' + e.message);
-    }
-    setTimeout(() => setToast(null), 2400);
-  };
+  const cardRef               = useRef(null);
+  const { onDownload, toast } = usePngExport(cardRef, food);
+
   return (
     <div style={{
       width: '100%', minHeight: '100%', background: '#F2F0EC',
@@ -742,32 +765,13 @@ function PWResultScreen({ food, onScanAgain, accent = PW_TOKENS.green }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// Desktop wrapper
+// Desktop wrapper — uses shared usePngExport hook
 // ──────────────────────────────────────────────────────────────
 function PWDesktopView({ state, setState, food, onAnalyze, onScanAgain, accent = PW_TOKENS.green, error }) {
-  const [toast, setToast] = useState(null);
-  const [howOpen, setHowOpen] = useState(false);
-  const cardRef = useRef(null);
-  const onDownload = async () => {
-    if (!cardRef.current || !food) return;
-    const filename = `platewise-${food.name.toLowerCase().replace(/\s+/g, '-')}.png`;
-    try {
-      const dataUrl = await toPng(cardRef.current, {
-        cacheBust: true,
-        backgroundColor: '#FFFFFF',
-        pixelRatio: 2,
-        filter: (node) => !(node.classList && node.classList.contains('pw-no-export')),
-      });
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
-      setToast('Downloaded · ' + filename);
-    } catch (e) {
-      setToast('Download failed: ' + e.message);
-    }
-    setTimeout(() => setToast(null), 2400);
-  };
+  const [howOpenState, setHowOpenState] = useState(false);
+  const cardRef               = useRef(null);
+  const { onDownload, toast } = usePngExport(cardRef, food);
+
   return (
     <div style={{
       width: '100%', height: '100%', minHeight: '100vh', background: '#F2F0EC',
@@ -781,7 +785,7 @@ function PWDesktopView({ state, setState, food, onAnalyze, onScanAgain, accent =
         position: 'sticky', top: 0, zIndex: 10,
       }}>
         <PWBrand size={18} />
-        <button onClick={() => setHowOpen(true)} style={{
+        <button onClick={() => setHowOpenState(true)} style={{
           background: '#fff', border: `1px solid ${PW_TOKENS.line}`,
           color: PW_TOKENS.ink, borderRadius: 999, padding: '8px 16px',
           fontSize: 13, fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
@@ -826,7 +830,7 @@ function PWDesktopView({ state, setState, food, onAnalyze, onScanAgain, accent =
         }}>{toast}</div>
       )}
 
-      {howOpen && <PWHowItWorks onClose={() => setHowOpen(false)} accent={accent} />}
+      {howOpenState && <PWHowItWorks onClose={() => setHowOpenState(false)} accent={accent} />}
     </div>
   );
 }
@@ -843,7 +847,7 @@ function PWHowItWorks({ onClose, accent = PW_TOKENS.green }) {
 
   const steps = [
     { n: '01', t: 'Name your dish', d: 'Type what you\'re eating — "Butter Chicken", "Avocado Toast", a coffee order. The more specific you are, the more accurate the breakdown.' },
-    { n: '02', t: 'Add a photo', d: 'Snap the plate or pull one from your gallery. The image is compressed client-side before being sent.' },
+    { n: '02', t: 'Add a photo', d: 'Snap the plate or pull one from your gallery. The image is compressed client-side to 600px and converted to JPEG before being sent.' },
     { n: '03', t: 'Tap Analyze', d: 'Platewise estimates calories, macros (carbs, protein, fat) and key micros (fiber, sugar, sodium) — and grades the dish from 1 to 10.' },
     { n: '04', t: 'Read the card', d: 'A premium nutrition infographic with a hero calorie number, a stacked macro bar, fun food trivia, and three concrete swaps to make the meal healthier.' },
     { n: '05', t: 'Save or share', d: 'Download the card as a PNG to drop in your journal, or tap "Scan Another" and keep going.' },
@@ -951,14 +955,17 @@ function PWHowItWorks({ onClose, accent = PW_TOKENS.green }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// Production App — responsive, wired to /api/analyze
+// Root App — responsive, wired to /api/analyze
 // ──────────────────────────────────────────────────────────────
 export default function App() {
-  const [state, setState] = useState({ foodName: '', photo: null, imageBase64: null, mimeType: 'image/jpeg' });
-  const [food, setFood] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [state, setState]       = useState({ foodName: '', photo: null, imageBase64: null, mimeType: 'image/jpeg' });
+  const [food, setFood]         = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  // Session-scoped dedup cache — identical name+image combos skip the API call
+  const scanCache = useRef(new Map());
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 640);
@@ -968,6 +975,14 @@ export default function App() {
 
   const onAnalyze = async () => {
     if (!state.foodName || !state.imageBase64) return;
+
+    // Dedup: key on normalised name + first 64 chars of base64
+    const cacheKey = `${state.foodName.trim().toLowerCase()}::${state.imageBase64.slice(0, 64)}`;
+    if (scanCache.current.has(cacheKey)) {
+      setFood(scanCache.current.get(cacheKey));
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -981,20 +996,23 @@ export default function App() {
         throw new Error(body.error || `Server error ${res.status}`);
       }
       const data = await res.json();
-      setFood({
-        name: data.name,
-        serving: data.serving,
-        score: data.healthScore,
-        kcal: data.calories,
-        carbs: data.macros.carbs,
-        protein: data.macros.protein,
-        fat: data.macros.fat,
-        fiber: data.other.fiber,
-        sugar: data.other.sugar,
-        sodium: data.other.sodium,
-        fact: data.fact,
-        tips: data.tips,
-      });
+      const foodData = {
+        name:     data.name,
+        serving:  data.serving,
+        score:    data.healthScore,
+        kcal:     data.calories,
+        carbs:    data.macros.carbs,
+        protein:  data.macros.protein,
+        fat:      data.macros.fat,
+        fiber:    data.other.fiber,
+        sugar:    data.other.sugar,
+        sodium:   data.other.sodium,
+        fact:     data.fact,
+        tips:     data.tips,
+        mismatch: data.mismatch,
+      };
+      scanCache.current.set(cacheKey, foodData);
+      setFood(foodData);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -1013,7 +1031,7 @@ export default function App() {
   if (isMobile) {
     return food
       ? <PWResultScreen food={food} onScanAgain={onScanAgain} />
-      : <PWInputScreen state={state} setState={setState} onAnalyze={onAnalyze} error={error} />;
+      : <PWInputScreen  state={state} setState={setState} onAnalyze={onAnalyze} error={error} />;
   }
 
   return (
