@@ -997,7 +997,7 @@ export default function App() {
 
   useEffect(() => {
     fetch('/api/auth')
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => setAuthed(!!d.authenticated))
       .catch(() => setAuthed(false));
   }, []);
@@ -1081,7 +1081,7 @@ export default function App() {
     }
   };
 
-  if (authed === null) return null;
+  if (authed === null) return <PWLoadingScreen />;
   if (authed === false) return <PWLock onUnlock={() => setAuthed(true)} />;
   if (view === 'history') return <PWHistory onBack={() => setView('scan')} />;
 
