@@ -1,0 +1,220 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  background: #FAFAF9;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+
+@keyframes pwFadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pwScaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pwChipIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pwSparkle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25%       { transform: rotate(15deg) scale(1.1); }
+  75%       { transform: rotate(-15deg) scale(0.95); }
+}
+
+@keyframes pwAurora {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.55; }
+  33%       { transform: translate(6%, 8%) scale(1.08); opacity: 0.65; }
+  66%       { transform: translate(-4%, 4%) scale(0.96); opacity: 0.5; }
+}
+
+@keyframes pwDrift {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.18; }
+  50%       { transform: translateY(-18px) rotate(8deg); opacity: 0.28; }
+}
+
+@keyframes pwPulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.4); opacity: 0.7; }
+}
+
+@keyframes pwWave {
+  0%, 100% { transform: rotate(0deg); }
+  20%       { transform: rotate(-18deg); }
+  50%       { transform: rotate(18deg); }
+  80%       { transform: rotate(-10deg); }
+}
+
+@keyframes pwBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@keyframes pwCtaPulse {
+  0%, 100% { box-shadow: 0 6px 20px rgba(20,16,12,0.18); }
+  50%       { box-shadow: 0 6px 28px rgba(20,16,12,0.32); }
+}
+
+@keyframes pwAnalyzeGlow {
+  0%, 100% { box-shadow: 0 6px 20px rgba(34,197,94,0.28); }
+  50%       { box-shadow: 0 6px 32px rgba(34,197,94,0.52); }
+}
+
+@keyframes pwShine {
+  0%   { left: -120%; }
+  100% { left: 160%; }
+}
+
+@keyframes pwHeartBeat {
+  0%, 100% { transform: scale(1); }
+  15%       { transform: scale(1.25); }
+  30%       { transform: scale(1); }
+  45%       { transform: scale(1.15); }
+  60%       { transform: scale(1); }
+}
+
+@keyframes pwGrainMove {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(-2%, -3%); }
+  50%  { transform: translate(-4%, 1%); }
+  75%  { transform: translate(2%, -2%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ── Animation utility classes ─────────────────────────────── */
+
+.pw-sparkle-spin {
+  animation: pwSparkle 2.8s ease-in-out infinite;
+  display: inline-flex;
+}
+
+/* Aurora blobs */
+.pw-aurora {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  animation: pwAurora 10s ease-in-out infinite;
+}
+.pw-aurora-1 {
+  width: 280px; height: 280px;
+  top: -60px; left: -40px;
+  animation-duration: 10s;
+}
+.pw-aurora-2 {
+  width: 200px; height: 200px;
+  top: 40%; right: -60px;
+  animation-duration: 13s;
+  animation-delay: -4s;
+}
+.pw-aurora-3 {
+  width: 180px; height: 180px;
+  bottom: -40px; left: 20%;
+  animation-duration: 15s;
+  animation-delay: -7s;
+}
+.pw-aurora-4 {
+  width: 240px; height: 240px;
+  top: 20%; left: 30%;
+  animation-duration: 11s;
+  animation-delay: -2s;
+}
+
+/* Drifting emoji floats */
+.pw-drift {
+  position: absolute;
+  pointer-events: none;
+  font-size: 18px;
+  animation: pwDrift 6s ease-in-out infinite;
+  user-select: none;
+  z-index: 0;
+}
+.pw-drift-1 { top: 12%; left: 8%;  animation-delay: 0s;   animation-duration: 7s; }
+.pw-drift-2 { top: 22%; right: 10%; animation-delay: -2s; animation-duration: 6s; }
+.pw-drift-3 { top: 55%; left: 5%;  animation-delay: -4s;  animation-duration: 8s; }
+.pw-drift-4 { top: 70%; right: 8%; animation-delay: -1s;  animation-duration: 7s; }
+.pw-drift-5 { top: 40%; left: 50%; animation-delay: -3s;  animation-duration: 9s; font-size: 10px; }
+
+/* Grain texture overlay */
+.pw-grain {
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  opacity: 0.025;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  animation: pwGrainMove 0.4s steps(1) infinite;
+}
+
+/* Status indicator dot */
+.pw-pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pwPulseDot 1.8s ease-in-out infinite;
+}
+
+/* Waving hand emoji */
+.pw-wave {
+  display: inline-block;
+  animation: pwWave 2.5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+/* Blinking text cursor in placeholder */
+.pw-caret {
+  display: inline-block;
+  animation: pwBlink 1s step-end infinite;
+  opacity: 1;
+  margin-left: 1px;
+}
+
+/* CTA button pulse */
+.pw-cta-pulse {
+  animation: pwCtaPulse 2s ease-in-out infinite;
+}
+
+/* Analyze button glow */
+.pw-analyze-glow {
+  animation: pwAnalyzeGlow 1.6s ease-in-out infinite;
+}
+
+/* Shine sweep on primary button */
+.pw-shine {
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.18) 50%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  animation: pwShine 3.5s ease-in-out infinite;
+}
+
+/* Heartbeat on the footer heart */
+.pw-heart {
+  display: inline-block;
+  animation: pwHeartBeat 2.2s ease-in-out infinite;
+}
+
+/* PNG export filter — no visual effect, just a hook for html-to-image */
+.pw-no-export {
+  /* intentionally empty */
+}
