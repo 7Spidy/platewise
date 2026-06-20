@@ -71,6 +71,20 @@ Response (validated server-side — 502 if shape is wrong):
 | Macro bar `safeTotal = total \|\| 1` + `flexFor = v => Math.max(v, safeTotal * 0.02)` | Prevents NaN% and zero-flex collapse on trace-calorie foods |
 | Run time estimate `÷ 10` | ≈10 kcal/min at a moderate running pace (was incorrectly ÷90) |
 
+## V2 implementation decisions
+
+| Decision | Why |
+|---|---|
+| Single shared passcode, no per-user accounts | Personal app — one household, no need for user table or registration flow |
+| Stateless signed cookie (`HMAC-SHA256` over expiry timestamp) | No session table to maintain; verified by re-computing HMAC — nothing to look up in DB |
+| `SESSION_SECRET` in env, never in code | Rotating the secret instantly invalidates all sessions without a DB migration |
+| Vercel Postgres (`meal_logs` table) | Native Vercel integration; `@vercel/postgres` handles pooling automatically |
+| Photo stored to Vercel Blob, URL saved on row | Avoids storing base64 in Postgres (column bloat); Blob CDN serves images faster |
+| `log-again` endpoint duplicates the row, reuses `photo_url` | No re-upload to Blob needed for a repeat entry — same image, new timestamp |
+| No "favorites" — log-again is the repeat mechanism | Simpler model: every log entry is just a timestamped meal; history + log-again covers the repeat use case without a separate favorites table |
+| `requireAuth` guard on `/api/analyze` | Passcode blocks the only expensive endpoint (Anthropic API call) |
+| `meal_type` column nullable, unused by UI | Reserved for future breakfast/lunch/dinner tagging without requiring a migration |
+
 ## What NOT to change without a reason
 - **Model**: do not switch away from `claude-haiku-4-5-20251001` without re-benchmarking cost + quality
 - **`tool_choice`**: must stay `{ type: 'tool', name: 'record_nutrition' }` — forced, not `auto`
