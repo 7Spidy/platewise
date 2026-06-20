@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { toPng } from 'html-to-image';
+import PWLock from './components/PWLock.jsx';
+import PWHistory from './components/PWHistory.jsx';
 
 // ──────────────────────────────────────────────────────────────
 // Design tokens
 // ──────────────────────────────────────────────────────────────
-const PW_TOKENS = {
+export const PW_TOKENS = {
   bg: '#FAFAF9',
   card: '#FFFFFF',
   ink: '#171513',
@@ -226,7 +228,7 @@ function usePWRotatingPlaceholder(items, intervalMs = 2400) {
 // ──────────────────────────────────────────────────────────────
 // SCREEN 1: Input
 // ──────────────────────────────────────────────────────────────
-function PWInputScreen({ state, setState, onAnalyze, accent = PW_TOKENS.green, error }) {
+function PWInputScreen({ state, setState, onAnalyze, onHistory, accent = PW_TOKENS.green, error }) {
   const inputRef = useRef(null);
   const fileRef  = useRef(null);
   const placeholders = ['e.g. Butter Chicken', 'e.g. Avocado Toast', 'e.g. Caesar Salad', 'e.g. Cold brew + oat milk', 'e.g. Margherita pizza'];
@@ -261,15 +263,21 @@ function PWInputScreen({ state, setState, onAnalyze, accent = PW_TOKENS.green, e
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <PWBrand size={26} animated />
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)',
-              border: `1px solid ${PW_TOKENS.line}`,
-              padding: '5px 10px 5px 8px', borderRadius: 999,
-              fontSize: 11.5, fontWeight: 500, color: PW_TOKENS.inkSoft, letterSpacing: -0.1,
-            }}>
-              <span className="pw-pulse-dot" style={{ background: accent }}></span>
-              Ready to scan
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={onHistory}
+                style={{ background: 'none', border: 'none', fontSize: 13, color: PW_TOKENS.inkSoft, cursor: 'pointer', fontFamily: 'inherit' }}
+              >History</button>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)',
+                border: `1px solid ${PW_TOKENS.line}`,
+                padding: '5px 10px 5px 8px', borderRadius: 999,
+                fontSize: 11.5, fontWeight: 500, color: PW_TOKENS.inkSoft, letterSpacing: -0.1,
+              }}>
+                <span className="pw-pulse-dot" style={{ background: accent }}></span>
+                Ready to scan
+              </div>
             </div>
           </div>
           <p style={{
@@ -563,7 +571,7 @@ function PWMicroPill({ icon, label, value, unit }) {
 // ──────────────────────────────────────────────────────────────
 // SCREEN 2: Result Card
 // ──────────────────────────────────────────────────────────────
-function PWResultCard({ food, onScanAgain, onDownload, accent = PW_TOKENS.green, embedded = false, cardRef }) {
+function PWResultCard({ food, onScanAgain, onSaveToLog, onDownload, accent = PW_TOKENS.green, embedded = false, cardRef }) {
   if (!food) return null;
   return (
     <div ref={cardRef} style={{
@@ -700,24 +708,30 @@ function PWResultCard({ food, onScanAgain, onDownload, accent = PW_TOKENS.green,
       </div>
 
       {/* Action buttons — excluded from PNG capture */}
-      <div className="pw-no-export" style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-        <button onClick={onDownload} style={{
-          flex: 1, background: '#fff', color: PW_TOKENS.ink,
-          border: `1.5px solid ${PW_TOKENS.line}`, borderRadius: 999,
-          padding: '14px 16px', fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          cursor: 'pointer', letterSpacing: -0.1,
-        }}>
-          {PWIcon.download(15)}
-          Download PNG
-        </button>
-        <button onClick={onScanAgain} style={{
-          flex: 1, background: accent, color: '#fff',
-          border: 'none', borderRadius: 999,
-          padding: '14px 16px', fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
-          cursor: 'pointer', letterSpacing: -0.1,
-          boxShadow: '0 4px 14px rgba(34,197,94,0.3)',
-        }}>Scan Another</button>
+      <div className="pw-no-export" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+        <button onClick={onSaveToLog} style={{
+          background: PW_TOKENS.ink, color: '#fff', border: 'none', borderRadius: 999,
+          padding: '13px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+        }}>Save to log</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onDownload} style={{
+            flex: 1, background: '#fff', color: PW_TOKENS.ink,
+            border: `1.5px solid ${PW_TOKENS.line}`, borderRadius: 999,
+            padding: '14px 16px', fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            cursor: 'pointer', letterSpacing: -0.1,
+          }}>
+            {PWIcon.download(15)}
+            Download PNG
+          </button>
+          <button onClick={onScanAgain} style={{
+            flex: 1, background: accent, color: '#fff',
+            border: 'none', borderRadius: 999,
+            padding: '14px 16px', fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
+            cursor: 'pointer', letterSpacing: -0.1,
+            boxShadow: '0 4px 14px rgba(34,197,94,0.3)',
+          }}>Scan Another</button>
+        </div>
       </div>
     </div>
   );
@@ -726,7 +740,7 @@ function PWResultCard({ food, onScanAgain, onDownload, accent = PW_TOKENS.green,
 // ──────────────────────────────────────────────────────────────
 // SCREEN 2 wrapper for mobile — uses shared usePngExport hook
 // ──────────────────────────────────────────────────────────────
-function PWResultScreen({ food, onScanAgain, accent = PW_TOKENS.green }) {
+function PWResultScreen({ food, onScanAgain, onSaveToLog, accent = PW_TOKENS.green }) {
   const cardRef               = useRef(null);
   const { onDownload, toast } = usePngExport(cardRef, food);
 
@@ -748,7 +762,7 @@ function PWResultScreen({ food, onScanAgain, accent = PW_TOKENS.green }) {
         <div style={{ width: 40 }}></div>
       </div>
 
-      <PWResultCard food={food} onScanAgain={onScanAgain} onDownload={onDownload} accent={accent} embedded cardRef={cardRef} />
+      <PWResultCard food={food} onScanAgain={onScanAgain} onSaveToLog={onSaveToLog} onDownload={onDownload} accent={accent} embedded cardRef={cardRef} />
 
       {toast && (
         <div style={{
@@ -767,7 +781,7 @@ function PWResultScreen({ food, onScanAgain, accent = PW_TOKENS.green }) {
 // ──────────────────────────────────────────────────────────────
 // Desktop wrapper — uses shared usePngExport hook
 // ──────────────────────────────────────────────────────────────
-function PWDesktopView({ state, setState, food, onAnalyze, onScanAgain, accent = PW_TOKENS.green, error }) {
+function PWDesktopView({ state, setState, food, onAnalyze, onScanAgain, onHistory, onSaveToLog, accent = PW_TOKENS.green, error }) {
   const [howOpenState, setHowOpenState] = useState(false);
   const cardRef               = useRef(null);
   const { onDownload, toast } = usePngExport(cardRef, food);
@@ -785,6 +799,11 @@ function PWDesktopView({ state, setState, food, onAnalyze, onScanAgain, accent =
         position: 'sticky', top: 0, zIndex: 10,
       }}>
         <PWBrand size={18} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={onHistory}
+            style={{ background: 'none', border: 'none', fontSize: 13, color: PW_TOKENS.inkSoft, cursor: 'pointer', fontFamily: 'inherit' }}
+          >History</button>
         <button onClick={() => setHowOpenState(true)} style={{
           background: '#fff', border: `1px solid ${PW_TOKENS.line}`,
           color: PW_TOKENS.ink, borderRadius: 999, padding: '8px 16px',
@@ -797,6 +816,7 @@ function PWDesktopView({ state, setState, food, onAnalyze, onScanAgain, accent =
           <span>How it works</span>
           <span style={{ fontSize: 11, opacity: 0.7 }}>→</span>
         </button>
+        </div>
       </div>
 
       <div style={{
@@ -815,7 +835,7 @@ function PWDesktopView({ state, setState, food, onAnalyze, onScanAgain, accent =
               }}>← Back</button>
               <span style={{ fontSize: 12, color: PW_TOKENS.inkMute, fontWeight: 500, letterSpacing: 0.4, textTransform: 'uppercase' }}>Result</span>
             </div>
-            <PWResultCard food={food} onScanAgain={onScanAgain} onDownload={onDownload} accent={accent} embedded cardRef={cardRef} />
+            <PWResultCard food={food} onScanAgain={onScanAgain} onSaveToLog={onSaveToLog} onDownload={onDownload} accent={accent} embedded cardRef={cardRef} />
           </React.Fragment>
         )}
       </div>
@@ -963,6 +983,8 @@ export default function App() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+  const [authed, setAuthed]     = useState(null);   // null = checking, true/false once known
+  const [view, setView]         = useState('scan'); // 'scan' | 'history'
 
   // Session-scoped dedup cache — identical name+image combos skip the API call
   const scanCache = useRef(new Map());
@@ -971,6 +993,13 @@ export default function App() {
     const onResize = () => setIsMobile(window.innerWidth < 640);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/auth')
+      .then((r) => r.json())
+      .then((d) => setAuthed(!!d.authenticated))
+      .catch(() => setAuthed(false));
   }, []);
 
   const onAnalyze = async () => {
@@ -1026,12 +1055,42 @@ export default function App() {
     setState({ foodName: '', photo: null, imageBase64: null, mimeType: 'image/jpeg' });
   };
 
+  const onSaveToLog = async () => {
+    if (!food) return;
+    try {
+      await fetch('/api/meals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: food.name,
+          serving: food.serving,
+          calories: food.kcal,
+          macros: { carbs: food.carbs, protein: food.protein, fat: food.fat },
+          other: { fiber: food.fiber, sugar: food.sugar, sodium: food.sodium },
+          healthScore: food.score,
+          fact: food.fact,
+          tips: food.tips,
+          mismatch: food.mismatch,
+          imageBase64: state.imageBase64,
+          mimeType: state.mimeType,
+        }),
+      });
+      onScanAgain();
+    } catch (e) {
+      console.error('Save failed', e);
+    }
+  };
+
+  if (authed === null) return null;
+  if (authed === false) return <PWLock onUnlock={() => setAuthed(true)} />;
+  if (view === 'history') return <PWHistory onBack={() => setView('scan')} />;
+
   if (loading) return <PWLoadingScreen />;
 
   if (isMobile) {
     return food
-      ? <PWResultScreen food={food} onScanAgain={onScanAgain} />
-      : <PWInputScreen  state={state} setState={setState} onAnalyze={onAnalyze} error={error} />;
+      ? <PWResultScreen food={food} onScanAgain={onScanAgain} onSaveToLog={onSaveToLog} />
+      : <PWInputScreen  state={state} setState={setState} onAnalyze={onAnalyze} onHistory={() => setView('history')} error={error} />;
   }
 
   return (
@@ -1041,6 +1100,8 @@ export default function App() {
       food={food}
       onAnalyze={onAnalyze}
       onScanAgain={onScanAgain}
+      onHistory={() => setView('history')}
+      onSaveToLog={onSaveToLog}
       error={error}
     />
   );

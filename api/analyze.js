@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { requireAuth } from '../lib/auth.js';
 
 const client = new Anthropic();
 
@@ -63,6 +64,8 @@ function validateResult(d) {
 }
 
 export default async function handler(req, res) {
+  if (!requireAuth(req, res)) return;
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
