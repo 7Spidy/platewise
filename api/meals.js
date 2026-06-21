@@ -7,14 +7,19 @@ export default async function handler(req, res) {
   if (!requireAuth(req, res)) return;
 
   if (req.method === 'GET') {
-    const { rows } = await sql`
-      select id, created_at, name, serving, calories, carbs_g, protein_g, fat_g,
-             fiber_g, sugar_g, sodium_mg, health_score, fact, tips, mismatch, photo_url, meal_type
-      from meal_logs
-      order by created_at desc
-      limit 200
-    `;
-    return res.status(200).json(rows);
+    try {
+      const { rows } = await sql`
+        select id, created_at, name, serving, calories, carbs_g, protein_g, fat_g,
+               fiber_g, sugar_g, sodium_mg, health_score, fact, tips, mismatch, photo_url, meal_type
+        from meal_logs
+        order by created_at desc
+        limit 200
+      `;
+      return res.status(200).json(rows);
+    } catch (err) {
+      console.error('GET /api/meals failed:', err);
+      return res.status(500).json({ error: err.message });
+    }
   }
 
   if (req.method === 'POST') {
@@ -34,25 +39,28 @@ export default async function handler(req, res) {
       try {
         photoUrl = await uploadMealPhoto(imageBase64, mimeType || 'image/jpeg');
       } catch (err) {
-        // Don't block the save just because the photo upload failed
         console.error('Blob upload failed:', err);
       }
     }
 
-    const { rows } = await sql`
-      insert into meal_logs
-        (name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
-         health_score, fact, tips, mismatch, photo_url, meal_type)
-      values
-        (${name}, ${serving ?? null}, ${calories},
-         ${macros.carbs ?? null}, ${macros.protein ?? null}, ${macros.fat ?? null},
-         ${other.fiber ?? null}, ${other.sugar ?? null}, ${other.sodium ?? null},
-         ${healthScore ?? null}, ${fact ?? null}, ${JSON.stringify(tips ?? [])},
-         ${!!mismatch}, ${photoUrl}, ${mealType ?? null})
-      returning *
-    `;
-
-    return res.status(201).json(rows[0]);
+    try {
+      const { rows } = await sql`
+        insert into meal_logs
+          (name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
+           health_score, fact, tips, mismatch, photo_url, meal_type)
+        values
+          (${name}, ${serving ?? null}, ${calories},
+           ${macros.carbs ?? null}, ${macros.protein ?? null}, ${macros.fat ?? null},
+           ${other.fiber ?? null}, ${other.sugar ?? null}, ${other.sodium ?? null},
+           ${healthScore ?? null}, ${fact ?? null}, ${JSON.stringify(tips ?? [])},
+           ${!!mismatch}, ${photoUrl}, ${mealType ?? null})
+        returning *
+      `;
+      return res.status(201).json(rows[0]);
+    } catch (err) {
+      console.error('POST /api/meals failed:', err);
+      return res.status(500).json({ error: err.message });
+    }
   }
 
   res.setHeader('Allow', 'GET, POST');
