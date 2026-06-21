@@ -233,7 +233,9 @@ function PWInputScreen({ state, setState, onAnalyze, onHistory, accent = PW_TOKE
   const fileRef  = useRef(null);
   const placeholders = ['e.g. Butter Chicken', 'e.g. Avocado Toast', 'e.g. Caesar Salad', 'e.g. Cold brew + oat milk', 'e.g. Margherita pizza'];
   const ph    = usePWRotatingPlaceholder(placeholders, 2600);
-  const ready = state.foodName && state.imageBase64;
+  const ready = state.mode === 'text'
+    ? !!(state.description && state.description.trim())
+    : !!(state.foodName && state.imageBase64);
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
@@ -286,106 +288,160 @@ function PWInputScreen({ state, setState, onAnalyze, onHistory, accent = PW_TOKE
           }}>Scan any food. <span style={{ color: PW_TOKENS.ink }}>Know what's inside.</span></p>
         </div>
 
-        {/* Input field */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <label style={{
-            fontSize: 13, fontWeight: 500, color: PW_TOKENS.inkSoft,
-            letterSpacing: 0.2, textTransform: 'uppercase',
-          }}>Food name</label>
-          <div style={{
-            background: '#fff', border: `1px solid ${PW_TOKENS.line}`,
-            borderRadius: 16, padding: '16px 18px',
-            boxShadow: PW_TOKENS.shadowSoft,
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minHeight: 24 }}>
-              <input
-                ref={inputRef}
-                value={state.foodName}
-                onChange={(e) => setState((s) => ({ ...s, foodName: e.target.value }))}
-                placeholder=""
-                maxLength={80}
-                style={{
-                  flex: 1, width: '100%', border: 'none', outline: 'none', background: 'transparent',
-                  fontFamily: 'inherit', fontSize: 17, color: PW_TOKENS.ink,
-                  letterSpacing: -0.2, position: 'relative', zIndex: 1,
-                }}
-              />
-              {!state.foodName && (
-                <span
-                  key={ph.text}
+        {/* Input field — photo mode: food name; text mode: description */}
+        {state.mode === 'photo' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{
+              fontSize: 13, fontWeight: 500, color: PW_TOKENS.inkSoft,
+              letterSpacing: 0.2, textTransform: 'uppercase',
+            }}>Food name</label>
+            <div style={{
+              background: '#fff', border: `1px solid ${PW_TOKENS.line}`,
+              borderRadius: 16, padding: '16px 18px',
+              boxShadow: PW_TOKENS.shadowSoft,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', minHeight: 24 }}>
+                <input
+                  ref={inputRef}
+                  value={state.foodName}
+                  onChange={(e) => setState((s) => ({ ...s, foodName: e.target.value }))}
+                  placeholder=""
+                  maxLength={80}
                   style={{
-                    position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-                    fontSize: 17, color: PW_TOKENS.inkMute, letterSpacing: -0.2,
-                    pointerEvents: 'none',
-                    opacity: ph.phase === 'in' ? 1 : 0,
-                    transition: 'opacity 0.28s ease, transform 0.28s ease',
-                  }}>{ph.text}<span className="pw-caret">|</span></span>
+                    flex: 1, width: '100%', border: 'none', outline: 'none', background: 'transparent',
+                    fontFamily: 'inherit', fontSize: 17, color: PW_TOKENS.ink,
+                    letterSpacing: -0.2, position: 'relative', zIndex: 1,
+                  }}
+                />
+                {!state.foodName && (
+                  <span
+                    key={ph.text}
+                    style={{
+                      position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                      fontSize: 17, color: PW_TOKENS.inkMute, letterSpacing: -0.2,
+                      pointerEvents: 'none',
+                      opacity: ph.phase === 'in' ? 1 : 0,
+                      transition: 'opacity 0.28s ease, transform 0.28s ease',
+                    }}>{ph.text}<span className="pw-caret">|</span></span>
+                )}
+              </div>
+              {state.foodName && (
+                <button onClick={() => setState((s) => ({ ...s, foodName: '' }))}
+                  style={{
+                    width: 22, height: 22, borderRadius: 11, border: 'none',
+                    background: PW_TOKENS.line, color: PW_TOKENS.inkSoft, cursor: 'pointer',
+                    fontSize: 14, lineHeight: 1, padding: 0,
+                  }}>×</button>
               )}
             </div>
-            {state.foodName && (
-              <button onClick={() => setState((s) => ({ ...s, foodName: '' }))}
-                style={{
-                  width: 22, height: 22, borderRadius: 11, border: 'none',
-                  background: PW_TOKENS.line, color: PW_TOKENS.inkSoft, cursor: 'pointer',
-                  fontSize: 14, lineHeight: 1, padding: 0,
-                }}>×</button>
-            )}
-          </div>
-          {/* Suggestions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-            <span style={{
-              fontSize: 11, color: PW_TOKENS.inkMute, fontWeight: 500,
-              letterSpacing: 0.5, textTransform: 'uppercase',
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-            }}>
-              <span className="pw-wave">👋</span> try one
-            </span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {DEMO_CHIPS.map((f, i) => (
-                <button key={f} onClick={() => setState((s) => ({ ...s, foodName: f }))}
-                  style={{
-                    background: state.foodName === f ? PW_TOKENS.greenSoft : 'rgba(255,255,255,0.85)',
-                    border: `1px solid ${state.foodName === f ? accent : PW_TOKENS.line}`,
-                    color: state.foodName === f ? PW_TOKENS.greenInk : PW_TOKENS.inkSoft,
-                    fontSize: 12.5, padding: '6px 11px', borderRadius: 999, cursor: 'pointer',
-                    fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s',
-                    backdropFilter: 'blur(6px)',
-                    animation: `pwChipIn 0.4s ${0.1 + i * 0.08}s both`,
-                  }}>{f}</button>
-              ))}
+            {/* Suggestions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11, color: PW_TOKENS.inkMute, fontWeight: 500,
+                letterSpacing: 0.5, textTransform: 'uppercase',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}>
+                <span className="pw-wave">👋</span> try one
+              </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {DEMO_CHIPS.map((f, i) => (
+                  <button key={f} onClick={() => setState((s) => ({ ...s, foodName: f }))}
+                    style={{
+                      background: state.foodName === f ? PW_TOKENS.greenSoft : 'rgba(255,255,255,0.85)',
+                      border: `1px solid ${state.foodName === f ? accent : PW_TOKENS.line}`,
+                      color: state.foodName === f ? PW_TOKENS.greenInk : PW_TOKENS.inkSoft,
+                      fontSize: 12.5, padding: '6px 11px', borderRadius: 999, cursor: 'pointer',
+                      fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s',
+                      backdropFilter: 'blur(6px)',
+                      animation: `pwChipIn 0.4s ${0.1 + i * 0.08}s both`,
+                    }}>{f}</button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{
+              fontSize: 13, fontWeight: 500, color: PW_TOKENS.inkSoft,
+              letterSpacing: 0.2, textTransform: 'uppercase',
+            }}>Describe your meal</label>
+            <textarea
+              value={state.description}
+              onChange={(e) => setState((s) => ({ ...s, description: e.target.value }))}
+              placeholder="e.g. grilled chicken 150g, basmati rice 200g, olive oil 10ml"
+              maxLength={500}
+              rows={4}
+              style={{
+                width: '100%', resize: 'vertical', boxSizing: 'border-box',
+                background: '#fff', border: `1px solid ${PW_TOKENS.line}`,
+                borderRadius: 16, padding: '16px 18px',
+                boxShadow: PW_TOKENS.shadowSoft,
+                fontFamily: 'inherit', fontSize: 16, color: PW_TOKENS.ink,
+                letterSpacing: -0.1, lineHeight: 1.5, outline: 'none',
+              }}
+            />
+            <p style={{ margin: 0, fontSize: 12.5, color: PW_TOKENS.inkMute }}>
+              List what's in it and roughly how much — Claude will infer the name and nutrition.
+            </p>
+          </div>
+        )}
 
-        {/* Primary CTA — photo upload */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
-          <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
-          <button onClick={() => fileRef.current?.click()}
-            className={!state.photo && state.foodName ? 'pw-cta-pulse' : ''}
+        {/* Mode switch row */}
+        {state.mode === 'photo' ? (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+            <button onClick={() => fileRef.current?.click()}
+              className={!state.photo && state.foodName ? 'pw-cta-pulse' : ''}
+              style={{
+                flex: 1, background: PW_TOKENS.ink, color: '#fff', border: 'none',
+                borderRadius: 999, padding: '18px 20px',
+                fontFamily: 'inherit', fontSize: 15, fontWeight: 600, letterSpacing: -0.1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                cursor: 'pointer', boxShadow: '0 6px 20px rgba(20,16,12,0.18)',
+                position: 'relative', overflow: 'hidden',
+              }}>
+              <span className="pw-shine"></span>
+              {PWIcon.camera(18)}
+              <span>Take Photo or Upload</span>
+            </button>
+            <button onClick={() => setState((s) => ({ ...s, mode: 'text' }))}
+              style={{
+                flex: 1, background: '#fff', color: PW_TOKENS.ink,
+                border: `1px solid ${PW_TOKENS.line}`,
+                borderRadius: 999, padding: '18px 20px',
+                fontFamily: 'inherit', fontSize: 15, fontWeight: 600, letterSpacing: -0.1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                cursor: 'pointer', boxShadow: PW_TOKENS.shadowSoft,
+              }}>
+              <span>✏️</span>
+              <span>Describe it instead</span>
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setState((s) => ({ ...s, mode: 'photo', description: '' }))}
             style={{
-              background: PW_TOKENS.ink, color: '#fff', border: 'none',
-              borderRadius: 999, padding: '18px 24px',
-              fontFamily: 'inherit', fontSize: 16, fontWeight: 600, letterSpacing: -0.1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              cursor: 'pointer', boxShadow: '0 6px 20px rgba(20,16,12,0.18)',
-              position: 'relative', overflow: 'hidden',
+              background: 'none', border: 'none', color: PW_TOKENS.inkSoft,
+              fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', padding: '4px 0', textAlign: 'left',
+              display: 'flex', alignItems: 'center', gap: 6,
             }}>
-            <span className="pw-shine"></span>
-            {PWIcon.camera(20)}
-            <span>Take Photo or Upload</span>
+            ← Use a photo instead
           </button>
+        )}
+
+        {state.mode === 'photo' && (
           <p style={{
-            margin: 0, fontSize: 13, color: PW_TOKENS.inkMute, textAlign: 'center',
+            margin: '-10px 0 0', fontSize: 13, color: PW_TOKENS.inkMute, textAlign: 'center',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}>
             {PWIcon.gallery(14, PW_TOKENS.inkMute)}
             Works with camera or gallery
           </p>
-        </div>
+        )}
 
-        {/* Photo preview + analyze */}
-        {state.photo && (
+        {/* Photo preview + analyze (photo mode only) */}
+        {state.mode === 'photo' && state.photo && (
           <div style={{
             display: 'flex', flexDirection: 'column', gap: 16,
             padding: 20, background: '#fff', borderRadius: 20,
@@ -414,7 +470,7 @@ function PWInputScreen({ state, setState, onAnalyze, onHistory, accent = PW_TOKE
                 </div>
               </div>
             </div>
-            <button onClick={onAnalyze} disabled={!state.foodName || !state.imageBase64}
+            <button onClick={onAnalyze} disabled={!ready}
               className={ready ? 'pw-analyze-glow' : ''}
               style={{
                 background: ready ? accent : '#D9D6D1',
@@ -430,6 +486,25 @@ function PWInputScreen({ state, setState, onAnalyze, onHistory, accent = PW_TOKE
               <span style={{ position: 'relative', zIndex: 1, display: 'inline-flex' }}>{PWIcon.arrow(16)}</span>
             </button>
           </div>
+        )}
+
+        {/* Analyze button (text mode only) */}
+        {state.mode === 'text' && (
+          <button onClick={onAnalyze} disabled={!ready}
+            className={ready ? 'pw-analyze-glow' : ''}
+            style={{
+              background: ready ? accent : '#D9D6D1',
+              color: '#fff', border: 'none', borderRadius: 999,
+              padding: '16px 24px', fontFamily: 'inherit',
+              fontSize: 16, fontWeight: 600, letterSpacing: -0.1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              cursor: ready ? 'pointer' : 'not-allowed',
+              boxShadow: ready ? '0 6px 20px rgba(34,197,94,0.28)' : 'none',
+              transition: 'all 0.2s', position: 'relative', overflow: 'hidden',
+            }}>
+            <span style={{ position: 'relative', zIndex: 1 }}>Analyze</span>
+            <span style={{ position: 'relative', zIndex: 1, display: 'inline-flex' }}>{PWIcon.arrow(16)}</span>
+          </button>
         )}
 
         {/* Error banner */}
@@ -978,7 +1053,7 @@ function PWHowItWorks({ onClose, accent = PW_TOKENS.green }) {
 // Root App — responsive, wired to /api/analyze
 // ──────────────────────────────────────────────────────────────
 export default function App() {
-  const [state, setState]       = useState({ foodName: '', photo: null, imageBase64: null, mimeType: 'image/jpeg' });
+  const [state, setState]       = useState({ foodName: '', photo: null, imageBase64: null, mimeType: 'image/jpeg', mode: 'photo', description: '' });
   const [food, setFood]         = useState(null);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
@@ -1003,10 +1078,17 @@ export default function App() {
   }, []);
 
   const onAnalyze = async () => {
-    if (!state.foodName || !state.imageBase64) return;
+    const isTextMode = state.mode === 'text';
+    if (isTextMode) {
+      if (!state.description || !state.description.trim()) return;
+    } else {
+      if (!state.foodName || !state.imageBase64) return;
+    }
 
-    // Dedup: key on normalised name + first 64 chars of base64
-    const cacheKey = `${state.foodName.trim().toLowerCase()}::${state.imageBase64.slice(0, 64)}`;
+    // Dedup: key on mode + normalised text/image
+    const cacheKey = isTextMode
+      ? `text::${state.description.trim().toLowerCase()}`
+      : `${state.foodName.trim().toLowerCase()}::${state.imageBase64.slice(0, 64)}`;
     if (scanCache.current.has(cacheKey)) {
       setFood(scanCache.current.get(cacheKey));
       return;
@@ -1015,10 +1097,14 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
+      const body = isTextMode
+        ? { description: state.description.trim() }
+        : { name: state.foodName, imageBase64: state.imageBase64, mimeType: state.mimeType };
+
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: state.foodName, imageBase64: state.imageBase64, mimeType: state.mimeType }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -1052,7 +1138,7 @@ export default function App() {
   const onScanAgain = () => {
     setFood(null);
     setError(null);
-    setState({ foodName: '', photo: null, imageBase64: null, mimeType: 'image/jpeg' });
+    setState({ foodName: '', photo: null, imageBase64: null, mimeType: 'image/jpeg', mode: 'photo', description: '' });
   };
 
   const onSaveToLog = async () => {
