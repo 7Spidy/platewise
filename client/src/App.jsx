@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import PWLock from './components/PWLock.jsx';
 import PWDashboard from './components/PWDashboard.jsx';
 import PWAddMeal from './components/PWAddMeal.jsx';
@@ -120,32 +121,38 @@ export default function App() {
 
   if (isSplitStep && isDesktop) {
     return (
-      <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', justifyContent: 'center', padding: '40px 24px', fontFamily: T.font }}>
-        <div style={{ display: 'flex', gap: 24, width: '100%', maxWidth: 920, alignItems: 'flex-start' }}>
-          <div style={{ flex: 1, background: '#fff', borderRadius: 20, border: `1px solid ${T.line}`, overflow: 'hidden', boxShadow: T.shadow }}>
-            <PWAddMeal onClose={goDashboard} onAnalyzed={onAnalyzed} />
+      <>
+        <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', justifyContent: 'center', padding: '40px 24px', fontFamily: T.font }}>
+          <div style={{ display: 'flex', gap: 24, width: '100%', maxWidth: 920, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, background: '#fff', borderRadius: 20, border: `1px solid ${T.line}`, overflow: 'hidden', boxShadow: T.shadow }}>
+              <PWAddMeal onClose={goDashboard} onAnalyzed={onAnalyzed} />
+            </div>
+            <div style={{ flex: 1, background: '#fff', borderRadius: 20, border: `1px solid ${T.line}`, overflow: 'hidden', boxShadow: T.shadow, minHeight: 200 }}>
+              {reviewData
+                ? <PWReview data={reviewData} draft={reviewDraft} onBack={() => setReviewData(null)} onSaved={goDashboard} />
+                : <div style={{ padding: 40, textAlign: 'center', color: T.inkMute, fontSize: 13 }}>Your AI review will appear here once you analyse a meal.</div>}
+            </div>
           </div>
-          <div style={{ flex: 1, background: '#fff', borderRadius: 20, border: `1px solid ${T.line}`, overflow: 'hidden', boxShadow: T.shadow, minHeight: 200 }}>
-            {reviewData
-              ? <PWReview data={reviewData} draft={reviewDraft} onBack={() => setReviewData(null)} onSaved={goDashboard} />
-              : <div style={{ padding: 40, textAlign: 'center', color: T.inkMute, fontSize: 13 }}>Your AI review will appear here once you analyse a meal.</div>}
-          </div>
+          <button onClick={() => setShowHowItWorks(true)} style={{ position: 'fixed', bottom: 20, left: 20, background: '#fff', border: `1px solid ${T.line}`, borderRadius: 999, padding: '7px 13px', fontSize: 11.5, color: T.inkMute, cursor: 'pointer', fontFamily: 'inherit', boxShadow: T.shadowSoft }}>How it works</button>
+          {showHowItWorks && <PWHowItWorks onClose={() => setShowHowItWorks(false)} />}
         </div>
-        <button onClick={() => setShowHowItWorks(true)} style={{ position: 'fixed', bottom: 20, left: 20, background: '#fff', border: `1px solid ${T.line}`, borderRadius: 999, padding: '7px 13px', fontSize: 11.5, color: T.inkMute, cursor: 'pointer', fontFamily: 'inherit', boxShadow: T.shadowSoft }}>How it works</button>
-        {showHowItWorks && <PWHowItWorks onClose={() => setShowHowItWorks(false)} />}
-      </div>
+        <SpeedInsights />
+      </>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: isDesktop ? 480 : '100%', minHeight: '100vh', background: T.bg, boxShadow: isDesktop ? T.shadow : 'none' }}>
-        {mainContent}
+    <>
+      <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: isDesktop ? 480 : '100%', minHeight: '100vh', background: T.bg, boxShadow: isDesktop ? T.shadow : 'none' }}>
+          {mainContent}
+        </div>
+        {view === 'dashboard' && (
+          <button onClick={() => setShowHowItWorks(true)} style={{ position: 'fixed', bottom: 28, left: 24, background: '#fff', border: `1px solid ${T.line}`, borderRadius: 999, padding: '7px 13px', fontSize: 11, color: T.inkMute, cursor: 'pointer', fontFamily: 'inherit', boxShadow: T.shadowSoft, zIndex: 15 }}>?</button>
+        )}
+        {showHowItWorks && <PWHowItWorks onClose={() => setShowHowItWorks(false)} />}
       </div>
-      {view === 'dashboard' && (
-        <button onClick={() => setShowHowItWorks(true)} style={{ position: 'fixed', bottom: 28, left: 24, background: '#fff', border: `1px solid ${T.line}`, borderRadius: 999, padding: '7px 13px', fontSize: 11, color: T.inkMute, cursor: 'pointer', fontFamily: 'inherit', boxShadow: T.shadowSoft, zIndex: 15 }}>?</button>
-      )}
-      {showHowItWorks && <PWHowItWorks onClose={() => setShowHowItWorks(false)} />}
-    </div>
+      <SpeedInsights />
+    </>
   );
 }
