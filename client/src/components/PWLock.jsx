@@ -9,6 +9,19 @@ export default function PWLock({ onUnlock }) {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const keyStyle = {
+    aspectRatio: '1',
+    borderRadius: '50%',
+    background: '#fff',
+    border: `1px solid ${PW_TOKENS.line}`,
+    fontFamily: 'inherit',
+    fontSize: 18,
+    fontWeight: 600,
+    color: PW_TOKENS.ink,
+    cursor: 'pointer',
+    boxShadow: PW_TOKENS.shadowSoft,
+  };
+
   const submit = async (passcode) => {
     setLoading(true);
     setError(null);
@@ -86,15 +99,3 @@ export default function PWLock({ onUnlock }) {
   );
 }
 
-const keyStyle = {
-  aspectRatio: '1',
-  borderRadius: '50%',
-  background: '#fff',
-  border: `1px solid ${PW_TOKENS.line}`,
-  fontFamily: 'inherit',
-  fontSize: 18,
-  fontWeight: 600,
-  color: PW_TOKENS.ink,
-  cursor: 'pointer',
-  boxShadow: PW_TOKENS.shadowSoft,
-};
