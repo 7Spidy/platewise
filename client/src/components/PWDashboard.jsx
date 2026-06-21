@@ -5,32 +5,21 @@ import { T, PWRing, PWIcon2, isoDate } from '../tokens.jsx';
 const MEAL_TYPES = ['breakfast', 'lunch', 'snack', 'dinner'];
 const MEAL_TYPE_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
 
-function detectMealType() {
-  const h = new Date().getHours();
-  if (h < 10) return 'breakfast';
-  if (h < 15) return 'lunch';
-  if (h < 18) return 'snack';
-  return 'dinner';
-}
 
 export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMeal, refreshSignal }) {
   const [meals, setMeals] = useState(null);
-  const [savedMeals, setSavedMeals] = useState([]);
   const [settings, setSettings] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [draftTargets, setDraftTargets] = useState(null);
-  const [busyChip, setBusyChip] = useState(null);
   const [error, setError] = useState(null);
 
   const load = async () => {
     try {
-      const [mealsRes, savedRes, settingsRes] = await Promise.all([
+      const [mealsRes, settingsRes] = await Promise.all([
         fetch(`/api/meals?date=${isoDate()}`),
-        fetch('/api/saved-meals'),
         fetch('/api/settings'),
       ]);
       if (mealsRes.ok) setMeals(await mealsRes.json());
-      if (savedRes.ok) setSavedMeals(await savedRes.json());
       if (settingsRes.ok) setSettings(await settingsRes.json());
     } catch (e) {
       setError('Could not load dashboard');
@@ -49,19 +38,6 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     };
   }, [meals]);
 
-  const quickAddChips = useMemo(() => {
-    if (!savedMeals.length) return [];
-    const now = Date.now();
-    const maxUse = Math.max(1, ...savedMeals.map((m) => m.use_count || 0));
-    const scored = savedMeals.map((m) => {
-      const lastUsed = m.last_used_at ? new Date(m.last_used_at).getTime() : 0;
-      const recency = lastUsed ? Math.max(0, 1 - (now - lastUsed) / (1000 * 60 * 60 * 24 * 30)) : 0;
-      const freq = (m.use_count || 0) / maxUse;
-      return { ...m, score: recency * 0.6 + freq * 0.4 };
-    });
-    return scored.sort((a, b) => b.score - a.score).slice(0, 6);
-  }, [savedMeals]);
-
   const mealsByType = useMemo(() => {
     const grouped = { breakfast: [], lunch: [], snack: [], dinner: [] };
     for (const m of meals || []) {
@@ -70,34 +46,6 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     }
     return grouped;
   }, [meals]);
-
-  const onQuickAdd = async (saved) => {
-    setBusyChip(saved.id);
-    try {
-      await fetch('/api/saved-meals', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: saved.id, bumpUse: true }),
-      });
-      await fetch('/api/meals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: saved.name,
-          calories: saved.calories,
-          macros: { carbs: saved.carbs_g, protein: saved.protein_g, fat: saved.fat_g },
-          other: { fiber: saved.fiber_g, sugar: saved.sugar_g, sodium: saved.sodium_mg },
-          ingredients: saved.ingredients,
-          mealType: detectMealType(),
-        }),
-      });
-      await load();
-    } catch (e) {
-      setError('Could not log that item');
-    } finally {
-      setBusyChip(null);
-    }
-  };
 
   const saveTargets = async () => {
     try {
@@ -161,28 +109,6 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         <MacroRing label="CARBS" value={totals.carbs} target={targets.target_carbs_g} />
         <MacroRing label="FAT" value={totals.fat} target={targets.target_fat_g} />
       </div>
-
-      {/* Quick add */}
-      {quickAddChips.length > 0 && (
-        <div style={{ marginBottom: 22 }}>
-          <div style={sectionLabelStyle}>QUICK ADD</div>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-            {quickAddChips.map((c) => (
-              <button key={c.id} onClick={() => onQuickAdd(c)} disabled={busyChip === c.id}
-                style={{
-                  flex: '0 0 auto', minWidth: 78, background: '#fff', border: `1px solid ${T.line}`,
-                  borderRadius: 14, padding: '10px 12px', display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', gap: 4, cursor: 'pointer', fontFamily: 'inherit',
-                  boxShadow: T.shadowSoft, opacity: busyChip === c.id ? 0.5 : 1,
-                }}>
-                <span style={{ fontSize: 20 }}>{busyChip === c.id ? '✓' : '🍽️'}</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: T.ink, whiteSpace: 'nowrap', maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
-                <span style={{ fontSize: 10.5, color: T.greenInk, fontWeight: 700 }}>{Math.round(c.calories)} cal</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Meal sections */}
       {meals === null && <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, marginTop: 30 }}>Loading…</div>}
