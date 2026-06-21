@@ -21,13 +21,14 @@ export default async function handler(req, res) {
   const { rows } = await sql`
     insert into meal_logs
       (name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
-       health_score, fact, tips, mismatch, photo_url, meal_type)
+       health_score, fact, tips, mismatch, photo_url, meal_type, ingredients)
     values
       (${source.name}, ${source.serving}, ${source.calories},
        ${source.carbs_g}, ${source.protein_g}, ${source.fat_g},
        ${source.fiber_g}, ${source.sugar_g}, ${source.sodium_mg},
        ${source.health_score}, ${source.fact}, ${JSON.stringify(source.tips ?? [])},
-       ${source.mismatch}, ${source.photo_url}, ${source.meal_type})
+       ${source.mismatch}, ${source.photo_url}, ${source.meal_type},
+       ${source.ingredients ? JSON.stringify(source.ingredients) : null})
     returning *
   `;
 

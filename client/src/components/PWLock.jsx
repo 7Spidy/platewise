@@ -57,7 +57,7 @@ export default function PWLock({ onUnlock }) {
     <div style={{
       minHeight: '100vh', width: '100%', background: PW_TOKENS.bg,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      gap: 22, fontFamily: 'Inter, system-ui',
+      gap: 22, fontFamily: "'DM Sans', system-ui, sans-serif",
     }}>
       <div style={{
         fontWeight: 700, fontSize: 20, letterSpacing: -0.4, color: PW_TOKENS.ink,

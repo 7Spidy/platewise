@@ -1,128 +1,130 @@
 // client/src/components/PWHistory.jsx
 import React, { useEffect, useState } from 'react';
-import { PW_TOKENS } from '../App.jsx';
+import { T, PWIcon2, isoDate } from '../tokens.jsx';
 
-export default function PWHistory({ onBack }) {
-  const [meals, setMeals] = useState(null); // null = loading
+function startOfWeek(d) {
+  const date = new Date(d);
+  const day = date.getDay(); // 0 = Sun
+  date.setDate(date.getDate() - day);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+function addDays(d, n) {
+  const date = new Date(d);
+  date.setDate(date.getDate() + n);
+  return date;
+}
+function fmtRange(start, end) {
+  const f = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${f(start)} – ${f(end)}`;
+}
+function fmtDayLabel(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+export default function PWHistory({ onBack, onEditMeal }) {
+  const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
+  const [days, setDays] = useState(null);
+  const [openDay, setOpenDay] = useState(null);
+  const [target, setTarget] = useState(2200);
   const [error, setError] = useState(null);
-  const [busyId, setBusyId] = useState(null);
 
-  useEffect(() => { load(); }, []);
+  const weekEnd = addDays(weekStart, 6);
 
   const load = async () => {
     try {
-      const res = await fetch('/api/meals');
-      if (!res.ok) throw new Error('Could not load history');
-      setMeals(await res.json());
+      const [histRes, settingsRes] = await Promise.all([
+        fetch(`/api/meals-history?start=${isoDate(weekStart)}&end=${isoDate(weekEnd)}`),
+        fetch('/api/settings'),
+      ]);
+      if (histRes.ok) {
+        const data = await histRes.json();
+        setDays(data.days);
+        if (data.days.length) setOpenDay(data.days[0].date);
+      }
+      if (settingsRes.ok) setTarget((await settingsRes.json()).target_calories || 2200);
     } catch (e) {
-      setError(e.message);
+      setError('Could not load history');
     }
   };
 
-  const logAgain = async (id) => {
-    setBusyId(id);
-    try {
-      const res = await fetch('/api/log-again', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      if (!res.ok) throw new Error('Could not log again');
-      await load();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusyId(null);
-    }
+  useEffect(() => { load(); }, [weekStart]);
+
+  const calColor = (cal) => {
+    if (cal === 0) return T.inkFaint;
+    if (cal <= target) return T.greenInk;
+    if (cal <= target * 1.1) return T.amber;
+    return T.red;
   };
 
-  const todayTotal = (meals || [])
-    .filter((m) => new Date(m.created_at).toDateString() === new Date().toDateString())
-    .reduce((sum, m) => sum + (m.calories || 0), 0);
+  // Build the full 7-day list for the week, filling in empty days
+  const allDays = [];
+  for (let i = 0; i < 7; i++) {
+    const d = isoDate(addDays(weekStart, i));
+    const existing = (days || []).find((x) => x.date === d);
+    allDays.push(existing || { date: d, total_calories: 0, meals: [] });
+  }
+  allDays.sort((a, b) => (a.date < b.date ? 1 : -1)); // most recent first
 
   return (
     <div style={{
-      minHeight: '100vh', background: PW_TOKENS.bg, fontFamily: 'Inter, system-ui',
-      padding: '24px 16px 40px', display: 'flex', flexDirection: 'column', gap: 16,
+      width: '100%', minHeight: '100%', background: T.bg, fontFamily: T.font,
+      padding: '24px 20px 60px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 14,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button onClick={onBack} style={{
-          background: '#fff', border: `1px solid ${PW_TOKENS.line}`, borderRadius: 999,
-          padding: '8px 14px', fontSize: 13, color: PW_TOKENS.inkSoft, cursor: 'pointer', fontFamily: 'inherit',
-        }}>← Back</button>
-        <span style={{ fontSize: 19, fontWeight: 800, letterSpacing: -0.5, color: PW_TOKENS.ink }}>History</span>
-        <div style={{ width: 64 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>{PWIcon2.chevLeft(18)}</button>
+        <div style={{ fontSize: 19, fontWeight: 800, color: T.ink, letterSpacing: -0.3 }}>History</div>
       </div>
 
-      {meals && meals.length > 0 && (
-        <div style={{
-          fontSize: 12.5, color: PW_TOKENS.inkSoft, background: '#fff',
-          border: `1px solid ${PW_TOKENS.line}`, borderRadius: 12, padding: '10px 14px',
-        }}>
-          Today so far · <b style={{ color: PW_TOKENS.ink }}>{todayTotal} kcal</b>
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', border: `1px solid ${T.line}`, borderRadius: 10, padding: '8px 12px' }}>
+        <button onClick={() => setWeekStart((w) => addDays(w, -7))} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>{PWIcon2.chevLeft(14)}</button>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: T.inkSoft }}>{fmtRange(weekStart, weekEnd)}</span>
+        <button onClick={() => setWeekStart((w) => addDays(w, 7))} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>{PWIcon2.chevRight(14, T.ink)}</button>
+      </div>
 
-      {error && <div style={{ color: '#B42318', fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ color: T.red, fontSize: 12.5 }}>{error}</div>}
+      {days === null && !error && <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, marginTop: 30 }}>Loading…</div>}
 
-      {meals === null && !error && (
-        <div style={{ color: PW_TOKENS.inkMute, fontSize: 13, textAlign: 'center', marginTop: 40 }}>Loading…</div>
-      )}
-
-      {meals && meals.length === 0 && (
-        <div style={{
-          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', gap: 10, textAlign: 'center', color: PW_TOKENS.inkSoft,
-        }}>
-          <div style={{ fontSize: 32 }}>🍽️</div>
-          <div style={{ fontWeight: 700, color: PW_TOKENS.ink }}>No meals logged yet</div>
-          <p style={{ fontSize: 13, maxWidth: 220, margin: 0 }}>
-            Scan a plate and save it to start building your history.
-          </p>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
-        {(meals || []).map((m) => (
-          <div key={m.id} style={{
-            display: 'flex', alignItems: 'center', gap: 10, background: '#fff',
-            border: `1px solid ${PW_TOKENS.line}`, borderRadius: 14, padding: '10px 12px',
-          }}>
-            <div style={{
-              width: 46, height: 46, borderRadius: 11, flex: '0 0 46px',
-              backgroundImage: m.photo_url ? `url(${m.photo_url})` : undefined,
-              backgroundSize: 'cover', backgroundPosition: 'center',
-              background: m.photo_url ? undefined : PW_TOKENS.greenSoft,
-            }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 13.5, fontWeight: 700, color: PW_TOKENS.ink,
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>{m.name}</div>
-              <div style={{ fontSize: 11, color: PW_TOKENS.inkMute }}>
-                {new Date(m.created_at).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: PW_TOKENS.ink }}>{m.calories} kcal</div>
-              {m.health_score != null && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, background: PW_TOKENS.greenSoft,
-                  color: PW_TOKENS.greenInk, borderRadius: 999, padding: '1px 7px', display: 'inline-block', marginTop: 2,
-                }}>{m.health_score}/10</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {days !== null && allDays.map((day) => {
+          const isOpen = openDay === day.date;
+          return (
+            <div key={day.date} style={{ background: '#fff', border: `1px solid ${T.line}`, borderRadius: 12, overflow: 'hidden' }}>
+              <button onClick={() => setOpenDay(isOpen ? null : day.date)} style={{
+                width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '11px 14px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: T.ink }}>
+                  <span style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s', display: 'inline-flex' }}>{PWIcon2.chevDown(11)}</span>
+                  {fmtDayLabel(day.date)}
+                </span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: calColor(day.total_calories) }}>
+                  {day.total_calories > 0 ? `${Math.round(day.total_calories)} kcal` : '—'}
+                </span>
+              </button>
+              {isOpen && (
+                <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {day.meals.length === 0 && (
+                    <div style={{ fontSize: 12, color: T.inkFaint, padding: '4px 0' }}>— no meals logged</div>
+                  )}
+                  {day.meals.map((m) => (
+                    <button key={m.id} onClick={() => onEditMeal(m)} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      background: T.lineSoft, border: 'none', borderRadius: 8, padding: '7px 10px',
+                      cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%',
+                    }}>
+                      <span style={{ fontSize: 12.5, color: T.ink, fontWeight: 500 }}>
+                        {m.name}
+                        <span style={{ color: T.inkFaint, fontWeight: 400 }}> · {new Date(m.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
+                      </span>
+                      <span style={{ fontSize: 12, color: T.inkMute }}>{Math.round(m.calories)} cal</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            <button
-              onClick={() => logAgain(m.id)}
-              disabled={busyId === m.id}
-              title="Log again"
-              style={{
-                width: 28, height: 28, borderRadius: 14, border: `1px solid ${PW_TOKENS.line}`,
-                background: PW_TOKENS.bg, fontSize: 13, cursor: 'pointer', flex: '0 0 28px',
-              }}
-            >{busyId === m.id ? '…' : '↻'}</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
