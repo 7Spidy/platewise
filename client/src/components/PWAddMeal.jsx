@@ -13,7 +13,8 @@ function detectMealType() {
 }
 
 export default function PWAddMeal({ onClose, onAnalyzed }) {
-  const fileRef = useRef(null);
+  const fileRef   = useRef(null);
+  const cameraRef = useRef(null);
   const [tab, setTab] = useState('photo'); // 'photo' | 'text'
   const [title, setTitle] = useState('');
   const [details, setDetails] = useState('');
@@ -102,26 +103,39 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
           style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
       </Field>
 
-      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+      {/* Hidden file inputs — one for gallery, one for camera (capture="environment") */}
+      <input ref={fileRef}   type="file" accept="image/*"                    onChange={onFile} style={{ display: 'none' }} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
+
       {photo ? (
-        <div onClick={() => fileRef.current?.click()} style={{
-          position: 'relative', height: 140, borderRadius: 14, overflow: 'hidden', cursor: 'pointer',
-          border: `1px solid ${T.line}`,
-        }}>
+        <div style={{ position: 'relative', height: 140, borderRadius: 14, overflow: 'hidden', border: `1px solid ${T.line}` }}>
           <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          <div style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(17,24,39,0.65)', color: '#fff', fontSize: 10.5, padding: '4px 8px', borderRadius: 999 }}>Change photo</div>
+          <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 6 }}>
+            <button onClick={() => cameraRef.current?.click()} style={changePhotoBtn}>📷 Retake</button>
+            <button onClick={() => fileRef.current?.click()}   style={changePhotoBtn}>🖼 Change</button>
+          </div>
         </div>
       ) : (
-        <button onClick={() => fileRef.current?.click()} style={{
-          height: 110, borderRadius: 14, border: `2px dashed ${T.line}`, background: T.lineSoft,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 6, cursor: 'pointer', fontFamily: 'inherit',
-        }}>
-          {PWIcon2.camera(26, T.inkFaint)}
-          <span style={{ fontSize: 11.5, color: T.inkFaint, fontWeight: 500 }}>
-            Add photo {tab === 'photo' ? '' : '(optional, helps with portions)'}
-          </span>
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => cameraRef.current?.click()} style={{
+            flex: 1, height: 90, borderRadius: 14, border: `2px dashed ${T.line}`, background: T.lineSoft,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 5, cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            {PWIcon2.camera(22, T.inkFaint)}
+            <span style={{ fontSize: 11, color: T.inkFaint, fontWeight: 500 }}>Take photo</span>
+          </button>
+          <button onClick={() => fileRef.current?.click()} style={{
+            flex: 1, height: 90, borderRadius: 14, border: `2px dashed ${T.line}`, background: T.lineSoft,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 5, cursor: 'pointer', fontFamily: 'inherit',
+          }}>
+            <span style={{ fontSize: 22 }}>🖼</span>
+            <span style={{ fontSize: 11, color: T.inkFaint, fontWeight: 500 }}>
+              {tab === 'photo' ? 'Upload' : 'Upload (optional)'}
+            </span>
+          </button>
+        </div>
       )}
 
       <Field label="Meal type">
@@ -155,4 +169,9 @@ function Field({ label, optional, children }) {
 const inputStyle = {
   width: '100%', boxSizing: 'border-box', background: '#fff', border: `1px solid ${T.line}`,
   borderRadius: 10, padding: '10px 12px', fontSize: 14, fontFamily: 'inherit', color: T.ink, outline: 'none',
+};
+
+const changePhotoBtn = {
+  background: 'rgba(17,24,39,0.65)', color: '#fff', border: 'none',
+  borderRadius: 999, fontSize: 10.5, padding: '4px 9px', cursor: 'pointer', fontFamily: 'inherit',
 };

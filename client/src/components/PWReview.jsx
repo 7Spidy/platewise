@@ -91,7 +91,10 @@ export default function PWReview({ data, draft, onBack, onSaved }) {
           mimeType: draft.mimeType,
         }),
       });
-      if (!res.ok) throw new Error('Could not save meal');
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error || 'Could not save meal');
+      }
       onSaved();
     } catch (e) {
       setError(e.message);
