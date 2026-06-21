@@ -48,6 +48,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'name and calories are required' });
     }
 
+    // Round all floats to integers — meal_logs columns are integer typed
+    const ri = (v) => (v != null ? Math.round(v) : null);
+
     let photoUrl = null;
     if (imageBase64) {
       try {
@@ -63,10 +66,10 @@ export default async function handler(req, res) {
           (name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
            health_score, fact, tips, mismatch, photo_url, meal_type, ingredients, created_at)
         values
-          (${name}, ${serving ?? null}, ${calories},
-           ${macros.carbs ?? null}, ${macros.protein ?? null}, ${macros.fat ?? null},
-           ${other.fiber ?? null}, ${other.sugar ?? null}, ${other.sodium ?? null},
-           ${healthScore ?? null}, ${fact ?? null}, ${JSON.stringify(tips ?? [])},
+          (${name}, ${serving ?? null}, ${ri(calories)},
+           ${ri(macros.carbs)}, ${ri(macros.protein)}, ${ri(macros.fat)},
+           ${ri(other.fiber)}, ${ri(other.sugar)}, ${ri(other.sodium)},
+           ${ri(healthScore)}, ${fact ?? null}, ${JSON.stringify(tips ?? [])},
            ${!!mismatch}, ${photoUrl}, ${mealType ?? null},
            ${ingredients ? JSON.stringify(ingredients) : null},
            ${loggedAt ? new Date(loggedAt).toISOString() : new Date().toISOString()})
@@ -94,19 +97,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'loggedAt is required (send the existing value if unchanged)' });
     }
 
+    const ri = (v) => (v != null ? Math.round(v) : null);
+
     try {
       const { rows } = await sql`
         update meal_logs set
           name         = ${name},
           serving      = ${serving ?? null},
-          calories     = ${calories},
-          carbs_g      = ${macros.carbs ?? null},
-          protein_g    = ${macros.protein ?? null},
-          fat_g        = ${macros.fat ?? null},
-          fiber_g      = ${other.fiber ?? null},
-          sugar_g      = ${other.sugar ?? null},
-          sodium_mg    = ${other.sodium ?? null},
-          health_score = ${healthScore ?? null},
+          calories     = ${ri(calories)},
+          carbs_g      = ${ri(macros.carbs)},
+          protein_g    = ${ri(macros.protein)},
+          fat_g        = ${ri(macros.fat)},
+          fiber_g      = ${ri(other.fiber)},
+          sugar_g      = ${ri(other.sugar)},
+          sodium_mg    = ${ri(other.sodium)},
+          health_score = ${ri(healthScore)},
           fact         = ${fact ?? null},
           tips         = ${JSON.stringify(tips ?? [])},
           mismatch     = ${!!mismatch},

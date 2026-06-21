@@ -239,7 +239,7 @@ export default function PWReview({ data, draft, onBack, onSaved }) {
       <button onClick={onSaveToLibrary} disabled={savedToLib} style={{
         background: '#fff', border: `1px solid ${T.line}`, color: savedToLib ? T.greenInk : T.ink,
         borderRadius: 10, padding: '11px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-      }}>{savedToLib ? '✓ Saved to library' : 'Save to library'}</button>
+      }}>{savedToLib ? '✓ Saved to Quick Library' : 'Save to Quick Library'}</button>
 
       <button onClick={onSaveMeal} disabled={saving} style={{
         background: T.green, color: '#fff', border: 'none', borderRadius: 10,
