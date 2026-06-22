@@ -33,9 +33,11 @@ export const PW_TOKENS = {
 
   shadow:     '0 1px 3px rgba(39,26,15,0.05), 0 8px 28px rgba(39,26,15,0.07)',
   shadowSoft: '0 1px 3px rgba(39,26,15,0.04), 0 4px 16px rgba(39,26,15,0.05)',
-  font:    "'DM Sans', system-ui, -apple-system, sans-serif",
-  heading: "'Playfair Display', Georgia, serif",
-  mono:    "'DM Mono', 'Fira Code', monospace",
+  fontDisplay: "'Fraunces', serif",
+  fontBody:    "'Inter', system-ui, sans-serif",
+  font:        "'Inter', system-ui, sans-serif",
+  heading:     "'Fraunces', serif",
+  mono:        "'DM Mono', 'Fira Code', monospace",
 };
 
 export const T = PW_TOKENS;

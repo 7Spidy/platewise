@@ -32,6 +32,7 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
   const [error, setError]         = useState(null);
 
   const weekEnd = addDays(weekStart, 6);
+  const isAtCurrentWeek = weekStart.getTime() >= startOfWeek(new Date()).getTime();
 
   const load = async () => {
     try {
@@ -99,9 +100,13 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
           {PWIcon2.chevLeft(14, T.green)}
         </button>
         <span style={{ fontSize: 13, fontWeight: 600, color: T.inkSoft }}>{fmtRange(weekStart, weekEnd)}</span>
-        <button onClick={() => setWeekStart((w) => addDays(w, 7))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-          {PWIcon2.chevRight(14, T.green)}
-        </button>
+        {isAtCurrentWeek
+          ? <div style={{ width: 22, height: 22 }} />
+          : (
+            <button onClick={() => setWeekStart((w) => addDays(w, 7))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+              {PWIcon2.chevRight(14, T.green)}
+            </button>
+          )}
       </div>
 
       {error && <div style={{ color: T.red, fontSize: 12.5 }}>{error}</div>}
