@@ -13,17 +13,16 @@ function detectMealType() {
 }
 
 export default function PWAddMeal({ onClose, onAnalyzed }) {
-  const fileRef   = useRef(null);
-  const cameraRef = useRef(null);
-  const [tab, setTab] = useState('photo'); // 'photo' | 'text'
-  const [title, setTitle] = useState('');
-  const [details, setDetails] = useState('');
-  const [photo, setPhoto] = useState(null);
+  const fileRef = useRef(null);
+  const [tab, setTab]             = useState('photo');
+  const [title, setTitle]         = useState('');
+  const [details, setDetails]     = useState('');
+  const [photo, setPhoto]         = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
-  const [mimeType, setMimeType] = useState('image/jpeg');
-  const [mealType, setMealType] = useState(detectMealType());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [mimeType, setMimeType]   = useState('image/jpeg');
+  const [mealType, setMealType]   = useState(detectMealType());
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState(null);
 
   const ready = tab === 'photo' ? !!imageBase64 : !!(title.trim() || details.trim());
 
@@ -36,6 +35,7 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
       setPhoto(preview);
       setImageBase64(base64);
       setMimeType(mt);
+      setError(null);
     } catch (err) {
       URL.revokeObjectURL(preview);
       setError(err.message);
@@ -72,94 +72,135 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
   return (
     <div style={{
       width: '100%', minHeight: '100%', background: T.bg, fontFamily: T.font,
-      padding: '24px 20px 60px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16,
+      padding: '24px 20px 60px', boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', gap: 16,
     }}>
+
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>{PWIcon2.close(18, T.green)}</button>
-        <div style={{ fontSize: 17, fontWeight: 700, color: T.ink }}>Add Meal</div>
+        <button onClick={onClose} style={{
+          width: 34, height: 34, borderRadius: 10, background: T.lineSoft,
+          border: 'none', display: 'grid', placeItems: 'center', cursor: 'pointer',
+        }}>
+          {PWIcon2.chevLeft(16, T.green)}
+        </button>
+        <div style={{ fontFamily: T.heading, fontSize: 20, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px' }}>
+          New Meal
+        </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', background: T.lineSoft, borderRadius: 12, padding: 4 }}>
-        {[['photo', '📷 Photo'], ['text', '✏️ Text']].map(([key, lbl]) => (
+      <div style={{ display: 'flex', background: T.lineSoft, borderRadius: 12, padding: 4, gap: 4 }}>
+        {[['photo', '📷  Photo'], ['text', '✏️  Text']].map(([key, lbl]) => (
           <button key={key} onClick={() => setTab(key)} style={{
             flex: 1, padding: '9px', borderRadius: 9, border: 'none', cursor: 'pointer',
-            fontFamily: 'inherit', fontSize: 13, fontWeight: 600,
+            fontFamily: T.font, fontSize: 13, fontWeight: 600,
             background: tab === key ? '#fff' : 'transparent',
-            color: tab === key ? T.greenInk : T.inkMute,
+            color: tab === key ? T.green : T.inkMute,
             boxShadow: tab === key ? T.shadowSoft : 'none',
+            transition: 'all 0.15s ease',
           }}>{lbl}</button>
         ))}
       </div>
 
       <Field label="Title" optional>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Scrambled Eggs"
-          style={inputStyle} />
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Scrambled Eggs"
+          style={inputStyle}
+        />
       </Field>
 
       <Field label="Details" optional>
-        <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3}
+        <textarea
+          value={details}
+          onChange={(e) => setDetails(e.target.value)}
+          rows={3}
           placeholder="e.g. three eggs, cooked in a little butter, salt and chili oil"
-          style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
+          style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
+        />
       </Field>
 
-      {/* Hidden file inputs — one for gallery, one for camera (capture="environment") */}
-      <input ref={fileRef}   type="file" accept="image/*"                    onChange={onFile} style={{ display: 'none' }} />
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
-
+      {/* Photo area */}
+      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
       {photo ? (
-        <div style={{ position: 'relative', height: 140, borderRadius: 14, overflow: 'hidden', border: `1px solid ${T.line}` }}>
+        <div onClick={() => fileRef.current?.click()} style={{
+          position: 'relative', height: 150, borderRadius: 14, overflow: 'hidden',
+          cursor: 'pointer', border: `1px solid ${T.line}`,
+        }}>
           <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', gap: 6 }}>
-            <button onClick={() => cameraRef.current?.click()} style={changePhotoBtn}>📷 Retake</button>
-            <button onClick={() => fileRef.current?.click()}   style={changePhotoBtn}>🖼 Change</button>
-          </div>
+          <div style={{
+            position: 'absolute', bottom: 10, right: 10,
+            background: 'rgba(39,26,15,0.65)', color: '#fff',
+            fontSize: 10.5, padding: '4px 10px', borderRadius: 999,
+          }}>Change photo</div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => cameraRef.current?.click()} style={{
-            flex: 1, height: 90, borderRadius: 14, border: `2px dashed ${T.line}`, background: T.lineSoft,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 5, cursor: 'pointer', fontFamily: 'inherit',
-          }}>
-            {PWIcon2.camera(22, T.inkFaint)}
-            <span style={{ fontSize: 11, color: T.inkFaint, fontWeight: 500 }}>Take photo</span>
-          </button>
-          <button onClick={() => fileRef.current?.click()} style={{
-            flex: 1, height: 90, borderRadius: 14, border: `2px dashed ${T.line}`, background: T.lineSoft,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 5, cursor: 'pointer', fontFamily: 'inherit',
-          }}>
-            <span style={{ fontSize: 22 }}>🖼</span>
-            <span style={{ fontSize: 11, color: T.inkFaint, fontWeight: 500 }}>
-              {tab === 'photo' ? 'Upload' : 'Upload (optional)'}
-            </span>
-          </button>
-        </div>
+        <button onClick={() => fileRef.current?.click()} style={{
+          height: 116, borderRadius: 14, border: `2px dashed ${T.line}`,
+          background: T.lineSoft, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 8,
+          cursor: 'pointer', fontFamily: T.font,
+        }}>
+          {PWIcon2.camera(26, T.inkFaint)}
+          <span style={{ fontSize: 12, color: T.inkFaint, fontWeight: 500 }}>
+            {tab === 'photo' ? 'Tap to add photo' : 'Add photo (optional, helps with portions)'}
+          </span>
+        </button>
       )}
 
       <Field label="Meal type">
-        <select value={mealType} onChange={(e) => setMealType(e.target.value)} style={inputStyle}>
-          {MEAL_TYPES.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {MEAL_TYPES.map((m) => (
+            <button key={m} onClick={() => setMealType(m)} style={{
+              padding: '8px 16px',
+              borderRadius: 22,
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: T.font,
+              fontSize: 13,
+              fontWeight: 600,
+              background: mealType === m ? T.green : T.lineSoft,
+              color: mealType === m ? '#fff' : T.inkMute,
+              transition: 'all 0.15s ease',
+            }}>{m}</button>
+          ))}
+        </div>
       </Field>
 
-      {error && <div style={{ background: T.red50, color: T.red, borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }}>⚠ {error}</div>}
+      {error && (
+        <div style={{ background: T.red50, color: T.red, borderRadius: 12, padding: '10px 14px', fontSize: 12.5 }}>
+          ⚠ {error}
+        </div>
+      )}
 
       <button onClick={onAnalyze} disabled={!ready || loading} style={{
-        background: ready ? T.green : '#D1D5DB', color: '#fff', border: 'none', borderRadius: 10,
-        padding: '13px', fontSize: 14.5, fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed',
-        fontFamily: 'inherit', marginTop: 4,
-      }}>{loading ? 'Analysing…' : 'Analyse →'}</button>
+        background: ready ? T.green : T.lineSoft,
+        color: ready ? '#fff' : T.inkFaint,
+        border: 'none', borderRadius: 14,
+        padding: '14px', fontSize: 15, fontWeight: 700,
+        cursor: ready ? 'pointer' : 'not-allowed',
+        fontFamily: T.font, marginTop: 4,
+        boxShadow: ready ? '0 6px 20px rgba(196,103,74,0.3)' : 'none',
+        transition: 'all 0.15s ease',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {loading ? 'Analysing…' : 'Analyse →'}
+      </button>
     </div>
   );
 }
 
 function Field({ label, optional, children }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      <label style={{ fontSize: 11, fontWeight: 700, color: T.inkMute, textTransform: 'uppercase', letterSpacing: 0.4 }}>
-        {label} {optional && <span style={{ fontWeight: 400, textTransform: 'none', color: T.inkFaint }}>(optional)</span>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label style={{
+        fontSize: 10.5, fontWeight: 700, color: T.inkMute,
+        textTransform: 'uppercase', letterSpacing: '0.07em',
+      }}>
+        {label}{' '}
+        {optional && <span style={{ fontWeight: 400, textTransform: 'none', color: T.inkFaint }}>(optional)</span>}
       </label>
       {children}
     </div>
@@ -167,11 +208,8 @@ function Field({ label, optional, children }) {
 }
 
 const inputStyle = {
-  width: '100%', boxSizing: 'border-box', background: '#fff', border: `1px solid ${T.line}`,
-  borderRadius: 10, padding: '10px 12px', fontSize: 14, fontFamily: 'inherit', color: T.ink, outline: 'none',
-};
-
-const changePhotoBtn = {
-  background: 'rgba(17,24,39,0.65)', color: '#fff', border: 'none',
-  borderRadius: 999, fontSize: 10.5, padding: '4px 9px', cursor: 'pointer', fontFamily: 'inherit',
+  width: '100%', boxSizing: 'border-box',
+  background: '#fff', border: `1.5px solid ${T.line}`,
+  borderRadius: 12, padding: '11px 14px',
+  fontSize: 14.5, fontFamily: 'inherit', color: T.ink, outline: 'none',
 };

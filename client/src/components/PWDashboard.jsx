@@ -1,27 +1,41 @@
 // client/src/components/PWDashboard.jsx
 import React, { useEffect, useState, useMemo } from 'react';
-import { T, PWRing, PWIcon2, isoDate } from '../tokens.jsx';
+import { T, PWRing, PWIcon2, BottomNav, getGreeting, isoDate } from '../tokens.jsx';
 
-const MEAL_TYPES = ['breakfast', 'lunch', 'snack', 'dinner'];
-const MEAL_TYPE_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
+const MEAL_TYPES  = ['breakfast', 'lunch', 'snack', 'dinner'];
+const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
 
+function detectMealType() {
+  const h = new Date().getHours();
+  if (h < 10) return 'breakfast';
+  if (h < 15) return 'lunch';
+  if (h < 18) return 'snack';
+  return 'dinner';
+}
 
 export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMeal, refreshSignal }) {
-  const [meals, setMeals] = useState(null);
-  const [settings, setSettings] = useState(null);
+  const [meals, setMeals]         = useState(null);
+  const [savedMeals, setSavedMeals] = useState([]);
+  const [settings, setSettings]   = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [draftTargets, setDraftTargets] = useState(null);
-  const [error, setError] = useState(null);
+  const [busyChip, setBusyChip]   = useState(null);
+  const [error, setError]         = useState(null);
+
+  const greeting = getGreeting();
+  const dateLabel = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
   const load = async () => {
     try {
-      const [mealsRes, settingsRes] = await Promise.all([
+      const [mealsRes, savedRes, settingsRes] = await Promise.all([
         fetch(`/api/meals?date=${isoDate()}`),
+        fetch('/api/saved-meals'),
         fetch('/api/settings'),
       ]);
-      if (mealsRes.ok) setMeals(await mealsRes.json());
+      if (mealsRes.ok)    setMeals(await mealsRes.json());
+      if (savedRes.ok)    setSavedMeals(await savedRes.json());
       if (settingsRes.ok) setSettings(await settingsRes.json());
-    } catch (e) {
+    } catch {
       setError('Could not load dashboard');
     }
   };
@@ -38,6 +52,19 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     };
   }, [meals]);
 
+  const quickAddChips = useMemo(() => {
+    if (!savedMeals.length) return [];
+    const now    = Date.now();
+    const maxUse = Math.max(1, ...savedMeals.map((m) => m.use_count || 0));
+    const scored = savedMeals.map((m) => {
+      const lastUsed = m.last_used_at ? new Date(m.last_used_at).getTime() : 0;
+      const recency  = lastUsed ? Math.max(0, 1 - (now - lastUsed) / (1000 * 60 * 60 * 24 * 30)) : 0;
+      const freq     = (m.use_count || 0) / maxUse;
+      return { ...m, score: recency * 0.6 + freq * 0.4 };
+    });
+    return scored.sort((a, b) => b.score - a.score).slice(0, 6);
+  }, [savedMeals]);
+
   const mealsByType = useMemo(() => {
     const grouped = { breakfast: [], lunch: [], snack: [], dinner: [] };
     for (const m of meals || []) {
@@ -47,6 +74,33 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     return grouped;
   }, [meals]);
 
+  const onQuickAdd = async (saved) => {
+    setBusyChip(saved.id);
+    try {
+      await fetch('/api/saved-meals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: saved.id, bumpUse: true }),
+      });
+      await fetch('/api/meals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: saved.name, calories: saved.calories,
+          macros:  { carbs: saved.carbs_g, protein: saved.protein_g, fat: saved.fat_g },
+          other:   { fiber: saved.fiber_g, sugar: saved.sugar_g, sodium: saved.sodium_mg },
+          ingredients: saved.ingredients,
+          mealType: detectMealType(),
+        }),
+      });
+      await load();
+    } catch {
+      setError('Could not log that item');
+    } finally {
+      setBusyChip(null);
+    }
+  };
+
   const saveTargets = async () => {
     try {
       const res = await fetch('/api/settings', {
@@ -55,123 +109,233 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         body: JSON.stringify({
           targetCalories: Number(draftTargets.target_calories),
           targetProteinG: Number(draftTargets.target_protein_g),
-          targetCarbsG: Number(draftTargets.target_carbs_g),
-          targetFatG: Number(draftTargets.target_fat_g),
+          targetCarbsG:   Number(draftTargets.target_carbs_g),
+          targetFatG:     Number(draftTargets.target_fat_g),
         }),
       });
       if (res.ok) setSettings(await res.json());
       setShowSettings(false);
-    } catch (e) {
+    } catch {
       setError('Could not save targets');
     }
   };
 
   const targets = settings || { target_calories: 2200, target_protein_g: 180, target_carbs_g: 200, target_fat_g: 70 };
+  const remaining = Math.max(0, targets.target_calories - Math.round(totals.calories));
 
   return (
     <div style={{
       width: '100%', minHeight: '100%', background: T.bg, fontFamily: T.font,
       padding: '28px 20px 100px', boxSizing: 'border-box', position: 'relative',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: -0.6, color: T.ink }}>Today</div>
-          <div style={{ fontSize: 12, color: T.inkMute, marginTop: 2 }}>
-            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          <div style={{
+            fontFamily: T.heading,
+            fontSize: 24, fontWeight: 700, color: T.ink,
+            letterSpacing: '-0.3px', lineHeight: 1.2,
+          }}>
+            {greeting}
           </div>
+          <div style={{ fontSize: 12, color: T.inkMute, marginTop: 3 }}>{dateLabel}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={onLibrary} style={navBtnStyle}>Saved Foods</button>
-          <button onClick={onHistory} style={navBtnStyle}>History</button>
-          <button onClick={() => { setDraftTargets({ ...targets }); setShowSettings(true); }}
-            style={{
-              width: 34, height: 34, borderRadius: 10, background: T.lineSoft, border: 'none',
-              display: 'grid', placeItems: 'center', cursor: 'pointer',
-            }}>{PWIcon2.gear(16)}</button>
-        </div>
+        <button
+          onClick={() => { setDraftTargets({ ...targets }); setShowSettings(true); }}
+          style={{
+            width: 36, height: 36, borderRadius: 10, background: '#fff',
+            border: `1px solid ${T.line}`, display: 'grid', placeItems: 'center',
+            cursor: 'pointer', boxShadow: T.shadowSoft,
+          }}>
+          {PWIcon2.gear(16)}
+        </button>
       </div>
 
-      {error && <div style={{ color: T.red, fontSize: 12.5, marginBottom: 10 }}>{error}</div>}
+      {error && (
+        <div style={{ color: T.red, fontSize: 12.5, marginBottom: 10 }}>{error}</div>
+      )}
 
-      {/* Calorie ring */}
+      {/* ── Calorie Ring ── */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
         <PWRing
-          value={totals.calories} target={targets.target_calories} size={150} stroke={12} color={T.green}
-          label={<span style={{ fontSize: 26, fontWeight: 800, color: T.ink, letterSpacing: -0.5 }}>{Math.round(totals.calories)}</span>}
-          sub={<span style={{ fontSize: 11, color: T.inkMute }}>kcal of {targets.target_calories}</span>}
+          value={totals.calories}
+          target={targets.target_calories}
+          size={160} stroke={13} color={T.green}
+          label={
+            <span style={{
+              fontFamily: T.heading,
+              fontSize: 30, fontWeight: 700, color: T.ink, letterSpacing: '-0.5px',
+            }}>
+              {Math.round(totals.calories).toLocaleString()}
+            </span>
+          }
+          sub={
+            <span style={{ fontSize: 11, color: T.inkMute }}>
+              {remaining > 0 ? `${remaining} kcal left` : 'Goal reached'}
+            </span>
+          }
         />
       </div>
 
-      {/* Macro rings */}
-      <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 24 }}>
-        <MacroRing label="PROTEIN" value={totals.protein} target={targets.target_protein_g} />
-        <MacroRing label="CARBS" value={totals.carbs} target={targets.target_carbs_g} />
-        <MacroRing label="FAT" value={totals.fat} target={targets.target_fat_g} />
-      </div>
-
-      {/* Meal sections */}
-      {meals === null && <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, marginTop: 30 }}>Loading…</div>}
-      {meals && meals.length === 0 && (
-        <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, marginTop: 30 }}>
-          🍽️ No meals logged yet today — tap + to add one.
-        </div>
-      )}
-      {meals && meals.length > 0 && MEAL_TYPES.map((type) => (
-        mealsByType[type].length > 0 && (
-          <div key={type} style={{ marginBottom: 16 }}>
-            <div style={sectionLabelStyle}>{MEAL_TYPE_LABEL[type].toUpperCase()}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {mealsByType[type].map((m) => (
-                <button key={m.id} onClick={() => onEditMeal && onEditMeal(m)} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  background: '#fff', border: `1px solid ${T.lineSoft}`, borderRadius: 10,
-                  padding: '9px 12px', cursor: onEditMeal ? 'pointer' : 'default', fontFamily: 'inherit',
-                  textAlign: 'left', width: '100%',
-                }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: T.ink }}>{m.name}</span>
-                  <span style={{ fontSize: 12.5, color: T.inkMute }}>{Math.round(m.calories)} cal</span>
-                </button>
-              ))}
+      {/* ── Macro Pills ── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 22 }}>
+        {[
+          { label: 'Protein', value: totals.protein,  target: targets.target_protein_g },
+          { label: 'Carbs',   value: totals.carbs,    target: targets.target_carbs_g },
+          { label: 'Fat',     value: totals.fat,      target: targets.target_fat_g },
+        ].map(({ label, value, target: tgt }) => (
+          <div key={label} style={{
+            flex: 1, background: T.lineSoft, borderRadius: 12, padding: '10px 12px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: T.ink }}>{Math.round(value)}g</div>
+            <div style={{ fontSize: 9.5, color: T.inkMute, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {label}
+            </div>
+            <div style={{
+              height: 3, background: T.line, borderRadius: 2, marginTop: 6, overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${Math.min(100, tgt > 0 ? (value / tgt) * 100 : 0)}%`,
+                height: '100%', background: T.green, borderRadius: 2,
+                transition: 'width 0.4s ease',
+              }} />
             </div>
           </div>
-        )
-      ))}
+        ))}
+      </div>
 
-      {/* FAB */}
-      <button onClick={onAddMeal} style={{
-        position: 'fixed', bottom: 28, right: 24, width: 56, height: 56, borderRadius: 28,
-        background: T.green, border: 'none', display: 'grid', placeItems: 'center',
-        boxShadow: '0 8px 20px rgba(22,163,74,0.4)', cursor: 'pointer', zIndex: 20,
-      }}>{PWIcon2.plus(24)}</button>
+      {/* ── Quick Add ── */}
+      {quickAddChips.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <div style={sectionLabelStyle}>Quick Add</div>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+            {quickAddChips.map((c) => (
+              <button key={c.id} onClick={() => onQuickAdd(c)} disabled={busyChip === c.id} style={{
+                flex: '0 0 auto', minWidth: 80,
+                background: '#fff', border: `1px solid ${T.line}`, borderRadius: 12,
+                padding: '10px 12px', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: 4, cursor: 'pointer', fontFamily: T.font,
+                boxShadow: T.shadowSoft, opacity: busyChip === c.id ? 0.5 : 1,
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: T.ink, whiteSpace: 'nowrap', maxWidth: 88, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {busyChip === c.id ? '✓ Added' : c.name}
+                </span>
+                <span style={{ fontSize: 10.5, color: T.green, fontWeight: 700 }}>{Math.round(c.calories)} cal</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-      {/* Settings popover */}
+      {/* ── Meal Sections ── */}
+      {meals === null && (
+        <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, marginTop: 30 }}>Loading…</div>
+      )}
+      {meals && meals.length === 0 && (
+        <div style={{
+          background: '#fff', border: `1px solid ${T.lineSoft}`, borderRadius: 16,
+          padding: '24px 20px', textAlign: 'center', color: T.inkMute, fontSize: 13,
+        }}>
+          Nothing logged yet today — tap + to add your first meal.
+        </div>
+      )}
+      {meals && meals.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden', boxShadow: T.shadowSoft }}>
+          {MEAL_TYPES.map((type, idx) => {
+            const entries = mealsByType[type];
+            return (
+              <div key={type} style={{
+                borderBottom: idx < MEAL_TYPES.length - 1 ? `1px solid ${T.lineSoft}` : 'none',
+              }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '12px 16px',
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.inkMute, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                    {MEAL_LABELS[type]}
+                  </div>
+                  <button onClick={onAddMeal} style={{
+                    width: 22, height: 22, background: entries.length ? T.green : T.lineSoft,
+                    borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', cursor: 'pointer',
+                  }}>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M5 2v6M2 5h6" stroke={entries.length ? '#fff' : T.inkFaint} strokeWidth="1.6" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                </div>
+                {entries.length > 0 ? entries.map((m) => (
+                  <button key={m.id} onClick={() => onEditMeal && onEditMeal(m)} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: 'none', border: 'none', padding: '8px 16px 10px',
+                    cursor: onEditMeal ? 'pointer' : 'default', fontFamily: T.font,
+                    textAlign: 'left', width: '100%',
+                  }}>
+                    <span style={{ fontSize: 13.5, fontWeight: 500, color: T.ink }}>{m.name}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: T.green }}>{Math.round(m.calories)}</span>
+                  </button>
+                )) : (
+                  <div style={{ fontSize: 12.5, color: T.inkFaint, padding: '0 16px 12px' }}>Nothing logged yet</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Bottom Nav ── */}
+      <BottomNav
+        active="home"
+        onHome={undefined}
+        onAdd={onAddMeal}
+        onHistory={onHistory}
+        onLibrary={onLibrary}
+      />
+
+      {/* ── Settings Popover ── */}
       {showSettings && draftTargets && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(17,24,39,0.35)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20,
+          position: 'fixed', inset: 0, background: 'rgba(39,26,15,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 50, padding: 20,
         }} onClick={() => setShowSettings(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{
-            background: '#fff', borderRadius: 18, padding: 22, width: '100%', maxWidth: 320,
-            display: 'flex', flexDirection: 'column', gap: 12, boxShadow: T.shadow,
+            background: '#fff', borderRadius: 20, padding: 24,
+            width: '100%', maxWidth: 320, boxShadow: T.shadow,
+            display: 'flex', flexDirection: 'column', gap: 14,
           }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: T.ink }}>Daily targets</div>
+            <div style={{ fontFamily: T.heading, fontSize: 18, fontWeight: 700, color: T.ink }}>Daily Targets</div>
             {[
               ['target_calories', 'Calories (kcal)'],
               ['target_protein_g', 'Protein (g)'],
               ['target_carbs_g', 'Carbs (g)'],
               ['target_fat_g', 'Fat (g)'],
             ].map(([key, label]) => (
-              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: T.inkMute, fontWeight: 600 }}>{label}</label>
-                <input type="number" value={draftTargets[key]}
+              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, color: T.inkMute, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</label>
+                <input
+                  type="number"
+                  value={draftTargets[key]}
                   onChange={(e) => setDraftTargets((d) => ({ ...d, [key]: e.target.value }))}
-                  style={{ border: `1px solid ${T.line}`, borderRadius: 8, padding: '7px 10px', fontSize: 14, fontFamily: 'inherit' }} />
+                  style={{
+                    border: `1.5px solid ${T.line}`, borderRadius: 10,
+                    padding: '10px 12px', fontSize: 15, fontFamily: T.font,
+                    color: T.ink, outline: 'none',
+                  }}
+                />
               </div>
             ))}
-            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              <button onClick={() => setShowSettings(false)} style={{ flex: 1, padding: '9px', borderRadius: 10, border: `1px solid ${T.line}`, background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={saveTargets} style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: T.green, color: '#fff', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Save</button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button onClick={() => setShowSettings(false)} style={{
+                flex: 1, padding: '11px', borderRadius: 12, border: `1px solid ${T.line}`,
+                background: '#fff', cursor: 'pointer', fontFamily: T.font, fontSize: 14, color: T.inkSoft,
+              }}>Cancel</button>
+              <button onClick={saveTargets} style={{
+                flex: 1, padding: '11px', borderRadius: 12, border: 'none',
+                background: T.green, color: '#fff', fontWeight: 700,
+                cursor: 'pointer', fontFamily: T.font, fontSize: 14,
+              }}>Save</button>
             </div>
           </div>
         </div>
@@ -180,22 +344,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
   );
 }
 
-function MacroRing({ label, value, target }) {
-  return (
-    <PWRing
-      value={value} target={target} size={70} stroke={6} color={T.green}
-      label={<span style={{ fontSize: 13, fontWeight: 700, color: T.ink }}>{Math.round(value)}g</span>}
-      sub={<span style={{ fontSize: 8.5, color: T.inkMute, fontWeight: 600, letterSpacing: 0.3 }}>{label}<br/>/{target}g</span>}
-    />
-  );
-}
-
-const navBtnStyle = {
-  background: 'none', border: 'none', fontSize: 11.5, fontWeight: 600,
-  color: T.inkMute, cursor: 'pointer', fontFamily: 'inherit', padding: '6px 4px',
-};
-
 const sectionLabelStyle = {
-  fontSize: 10.5, fontWeight: 700, color: T.inkMute, letterSpacing: 0.6,
-  textTransform: 'uppercase', marginBottom: 8,
+  fontSize: 10.5, fontWeight: 700, color: T.inkMute,
+  letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10,
 };

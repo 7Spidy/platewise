@@ -1,38 +1,44 @@
-// client/src/tokens.js
-// Design tokens lifted directly from the NutriLog mockup palette.
+// client/src/tokens.jsx — Nourish theme: Terracotta · Cream · Sage
+import React from 'react';
+
 export const PW_TOKENS = {
-  bg:        '#F9FAFB',
+  bg:        '#F7F3EE',
   card:      '#FFFFFF',
-  ink:       '#111827',
-  inkSoft:   '#374151',
-  inkMute:   '#6B7280',
-  inkFaint:  '#9CA3AF',
-  line:      '#E5E7EB',
-  lineSoft:  '#F3F4F6',
+  ink:       '#271A0F',
+  inkSoft:   '#5C4030',
+  inkMute:   '#9A7A66',
+  inkFaint:  '#C4B4A4',
+  line:      '#E8DDD0',
+  lineSoft:  '#EFE6DA',
 
-  green:     '#16A34A',
-  greenInk:  '#15803D',
-  greenSoft: '#DCFCE7',
-  green50:   '#F0FDF4',
+  // Terracotta is the primary accent — kept on 'green' key for backward compat
+  green:     '#C4674A',
+  greenInk:  '#A0492E',
+  greenSoft: '#F5ECE6',
+  green50:   '#FAF7F4',
 
-  amber:     '#D97706',
-  amber50:   '#FFFBEB',
-  red:       '#DC2626',
+  sage:      '#5C8A50',
+  sageSoft:  '#EAF2E6',
+
+  amber:     '#C47830',
+  amber50:   '#FFF8F0',
+  red:       '#B42318',
   red50:     '#FEF2F2',
   blue:      '#2563EB',
   blue50:    '#EFF6FF',
 
-  carbs:     '#2563EB',
-  protein:   '#D97706',
-  fat:       '#DC2626',
+  carbs:     '#C47830',
+  protein:   '#5C8A50',
+  fat:       '#9A7A66',
 
-  shadow:     '0 1px 2px rgba(17,24,39,0.04), 0 8px 28px rgba(17,24,39,0.06)',
-  shadowSoft: '0 1px 2px rgba(17,24,39,0.04), 0 4px 16px rgba(17,24,39,0.04)',
-  font: "'DM Sans', system-ui, -apple-system, sans-serif",
-  mono: "'DM Mono', 'Fira Code', monospace",
+  shadow:     '0 1px 3px rgba(39,26,15,0.05), 0 8px 28px rgba(39,26,15,0.07)',
+  shadowSoft: '0 1px 3px rgba(39,26,15,0.04), 0 4px 16px rgba(39,26,15,0.05)',
+  font:    "'DM Sans', system-ui, -apple-system, sans-serif",
+  heading: "'Playfair Display', Georgia, serif",
+  mono:    "'DM Mono', 'Fira Code', monospace",
 };
 
-export const T = PW_TOKENS; // short alias used inside the new screen files
+export const T = PW_TOKENS;
 
 export function fmtDay(d) {
   return new Date(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -42,17 +48,22 @@ export function isoDate(d = new Date()) {
   return d.toISOString().slice(0, 10);
 }
 
-// Image compression — 600px max, always JPEG, with error handling
+export function getGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'Good morning, Avi';
+  if (h >= 12 && h < 17) return 'Good afternoon, Avi';
+  if (h >= 17 && h < 21) return 'Good evening, Avi';
+  return 'Good night, Avi';
+}
+
 export function compressImage(file, maxPx = 600) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-
     img.onerror = () => {
       URL.revokeObjectURL(url);
       reject(new Error('Could not read image. The file may be corrupt or an unsupported format.'));
     };
-
     img.onload = () => {
       URL.revokeObjectURL(url);
       let { width, height } = img;
@@ -66,15 +77,12 @@ export function compressImage(file, maxPx = 600) {
       canvas.height = height;
       canvas.getContext('2d').drawImage(img, 0, 0, width, height);
       const base64   = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-      const mimeType = 'image/jpeg';
-      resolve({ base64, mimeType });
+      resolve({ base64, mimeType: 'image/jpeg' });
     };
-
     img.src = url;
   });
 }
 
-// Small reusable progress ring used on the Dashboard
 export function PWRing({ value, target, size = 96, stroke = 9, color = T.green, label, sub }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -88,13 +96,84 @@ export function PWRing({ value, target, size = 96, stroke = 9, color = T.green, 
       </svg>
       <div style={{
         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', lineHeight: 1.15,
+        alignItems: 'center', justifyContent: 'center', lineHeight: 1.2,
       }}>
         {label}
         {sub}
       </div>
     </div>
   );
+}
+
+// Shared bottom navigation bar used by Dashboard, History, Library
+export function BottomNav({ active, onHome, onAdd, onHistory, onLibrary }) {
+  const col = (key) => active === key ? T.green : T.inkFaint;
+  const fw  = (key) => active === key ? 700 : 500;
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+      width: '100%', maxWidth: 480,
+      height: 72, background: T.card, borderTop: `1px solid ${T.line}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+      padding: '0 12px 10px', zIndex: 20, boxSizing: 'border-box',
+    }}>
+      {/* Home */}
+      <button onClick={onHome || undefined} style={navTabStyle(col('home'))}>
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M2 11L11 3l9 8v8h-5.5v-5h-7v5H2v-8z"
+            fill={active === 'home' ? T.green : 'none'}
+            stroke={col('home')} strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+        <span style={{ fontSize: 9.5, color: col('home'), fontWeight: fw('home'), fontFamily: T.font }}>Home</span>
+      </button>
+
+      {/* Add — floating center */}
+      <button onClick={onAdd || undefined} style={{
+        width: 48, height: 48, background: T.green, borderRadius: '50%', border: 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginBottom: 20, cursor: 'pointer', flexShrink: 0,
+        boxShadow: '0 6px 20px rgba(196,103,74,0.38)',
+      }}>
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M11 4v14M4 11h14" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {/* History */}
+      <button onClick={onHistory || undefined} style={navTabStyle(col('history'))}>
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <rect x="2" y="3" width="18" height="17" rx="2.5"
+            fill={active === 'history' ? T.green : 'none'}
+            stroke={col('history')} strokeWidth="1.6" />
+          <path d="M2 9h18M7 1v4M15 1v4"
+            stroke={active === 'history' ? '#fff' : col('history')}
+            strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+        <span style={{ fontSize: 9.5, color: col('history'), fontWeight: fw('history'), fontFamily: T.font }}>History</span>
+      </button>
+
+      {/* Library */}
+      <button onClick={onLibrary || undefined} style={navTabStyle(col('library'))}>
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <rect x="2" y="2" width="18" height="18" rx="2.5"
+            fill={active === 'library' ? T.green : 'none'}
+            stroke={col('library')} strokeWidth="1.6" />
+          <path d="M6 8h10M6 12h6"
+            stroke={active === 'library' ? '#fff' : col('library')}
+            strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+        <span style={{ fontSize: 9.5, color: col('library'), fontWeight: fw('library'), fontFamily: T.font }}>Library</span>
+      </button>
+    </div>
+  );
+}
+
+function navTabStyle(color) {
+  return {
+    background: 'none', border: 'none', cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+    padding: '4px 10px',
+  };
 }
 
 export const PWIcon2 = {
