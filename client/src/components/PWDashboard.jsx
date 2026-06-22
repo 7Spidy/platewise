@@ -1,6 +1,8 @@
 // client/src/components/PWDashboard.jsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { T, PWRing, PWIcon2, BottomNav, getGreeting, isoDate } from '../tokens.jsx';
+import PWMealView from './PWMealView.jsx';
+import { exportMealPdf } from '../lib/exportPdf.js';
 
 const MEAL_TYPES  = ['breakfast', 'lunch', 'snack', 'dinner'];
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
@@ -34,6 +36,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
   const [draftTargets, setDraftTargets] = useState(null);
   const [busyChip, setBusyChip]         = useState(null);
   const [error, setError]               = useState(null);
+  const [viewingMeal, setViewingMeal]   = useState(null);
 
   const isReadOnly = dateOffset !== 0;
 
@@ -335,10 +338,10 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
                   )}
                 </div>
                 {entries.length > 0 ? entries.map((m) => (
-                  <button key={m.id} onClick={() => onEditMeal && onEditMeal(m)} style={{
+                  <button key={m.id} onClick={() => setViewingMeal(m)} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     background: 'none', border: 'none', padding: '8px 16px 10px',
-                    cursor: onEditMeal ? 'pointer' : 'default', fontFamily: T.font,
+                    cursor: 'pointer', fontFamily: T.font,
                     textAlign: 'left', width: '100%',
                   }}>
                     <span style={{ fontSize: 13.5, fontWeight: 500, color: T.ink }}>{m.name}</span>
@@ -352,6 +355,17 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
           })}
         </div>
       )}
+
+      {/* ── Meal detail view ── */}
+      <PWMealView
+        meal={viewingMeal}
+        onClose={() => setViewingMeal(null)}
+        onEdit={() => { const m = viewingMeal; setViewingMeal(null); onEditMeal && onEditMeal(m); }}
+        onShare={async () => {
+          try { await exportMealPdf(viewingMeal); }
+          catch { setError('PDF export failed — please try again'); }
+        }}
+      />
 
       {/* ── Bottom Nav ── */}
       <BottomNav

@@ -1,10 +1,10 @@
 // client/src/components/PWHistory.jsx
 import React, { useEffect, useState } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { toPng } from 'html-to-image';
-import jsPDF from 'jspdf';
 import { T, PWIcon2, BottomNav, isoDate } from '../tokens.jsx';
 import PWConfirm from './PWConfirm.jsx';
+import PWMealView from './PWMealView.jsx';
+import { exportMealPdf } from '../lib/exportPdf.js';
 
 function fmtDayLabel(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, {
@@ -18,71 +18,6 @@ function fmtXTick(dateStr, range) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function slugify(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-async function exportMealPdf(meal) {
-  const cardW = 375, cardH = 600;
-  const node = document.createElement('div');
-  node.style.cssText = [
-    `width:${cardW}px`, `height:${cardH}px`, 'background:#fff',
-    "font-family:'Inter',system-ui,sans-serif", 'position:fixed',
-    'top:-9999px', 'left:-9999px', 'padding:28px', 'box-sizing:border-box',
-    'overflow:hidden',
-  ].join(';');
-
-  const photoHtml = meal.photo_url
-    ? `<img src="${meal.photo_url}" crossorigin="anonymous"
-         style="width:100%;height:160px;object-fit:cover;border-radius:12px;margin-bottom:16px;display:block" />`
-    : `<div style="width:100%;height:160px;background:#F7F3EE;border-radius:12px;
-         margin-bottom:16px;display:flex;align-items:center;justify-content:center;
-         font-size:52px">🍽</div>`;
-
-  const rows = [
-    ['Carbs',   meal.carbs_g,   'g'],
-    ['Protein', meal.protein_g, 'g'],
-    ['Fat',     meal.fat_g,     'g'],
-    ['Fiber',   meal.fiber_g,   'g'],
-    ['Sugar',   meal.sugar_g,   'g'],
-    ['Sodium',  meal.sodium_mg, 'mg'],
-  ].map(([label, val, unit], i) => `
-    <tr style="background:${i % 2 === 0 ? '#F7F3EE' : '#fff'}">
-      <td style="padding:7px 10px;color:#5C4030;font-size:13px">${label}</td>
-      <td style="padding:7px 10px;text-align:right;font-weight:600;color:#271A0F;font-size:13px">
-        ${val != null ? Math.round(val) + unit : '—'}
-      </td>
-    </tr>`).join('');
-
-  node.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
-      <div style="width:26px;height:26px;background:#C4674A;border-radius:7px"></div>
-      <span style="font-size:15px;font-weight:700;color:#271A0F;letter-spacing:-0.3px">Platewise</span>
-    </div>
-    ${photoHtml}
-    <div style="font-size:20px;font-weight:700;color:#271A0F;margin-bottom:3px;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${meal.name}</div>
-    <div style="font-size:12px;color:#9A7A66;margin-bottom:14px">
-      ${[meal.serving, meal.meal_type].filter(Boolean).join(' · ')}
-    </div>
-    <div style="font-size:44px;font-weight:700;color:#C4674A;margin-bottom:16px;line-height:1">
-      ${Math.round(meal.calories)}<span style="font-size:15px;font-weight:400;color:#9A7A66"> kcal</span>
-    </div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:24px">${rows}</table>
-    <div style="font-size:10px;color:#C4B4A4;text-align:center">
-      Exported ${new Date().toLocaleDateString()} · Platewise
-    </div>`;
-
-  document.body.appendChild(node);
-  try {
-    const png = await toPng(node, { width: cardW, height: cardH, pixelRatio: 2 });
-    const pdf = new jsPDF({ unit: 'px', format: [cardW, cardH] });
-    pdf.addImage(png, 'PNG', 0, 0, cardW, cardH);
-    pdf.save(`platewise-${slugify(meal.name)}.pdf`);
-  } finally {
-    document.body.removeChild(node);
-  }
-}
 
 const LEGEND = [
   { key: 'total_calories',  label: 'Calories', color: T.green,  dash: '' },
@@ -98,6 +33,7 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
   const [target, setTarget]             = useState(2200);
   const [error, setError]               = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null);
+  const [viewingMeal, setViewingMeal]     = useState(null);
 
   const load = async () => {
     try {
@@ -284,9 +220,9 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
                           </div>
                       }
                       {/* Info */}
-                      <button onClick={() => onEditMeal && onEditMeal(m)} style={{
+                      <button onClick={() => setViewingMeal(m)} style={{
                         flex: 1, background: 'none', border: 'none', padding: 0,
-                        cursor: onEditMeal ? 'pointer' : 'default', fontFamily: T.font,
+                        cursor: 'pointer', fontFamily: T.font,
                         textAlign: 'left', minWidth: 0,
                       }}>
                         <div style={{ fontSize: 13, color: T.ink, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -324,6 +260,17 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
           );
         })}
       </div>
+
+      {/* Meal detail view */}
+      <PWMealView
+        meal={viewingMeal}
+        onClose={() => setViewingMeal(null)}
+        onEdit={() => { const m = viewingMeal; setViewingMeal(null); onEditMeal && onEditMeal(m); }}
+        onShare={async () => {
+          try { await exportMealPdf(viewingMeal); }
+          catch { setError('PDF export failed — please try again'); }
+        }}
+      />
 
       {/* Delete confirmation */}
       <PWConfirm
