@@ -46,8 +46,17 @@ export function fmtDay(d) {
   return new Date(d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-export function isoDate(d = new Date()) {
-  return d.toISOString().slice(0, 10);
+export function isoDate(d) {
+  if (typeof d === 'number') {
+    const date = new Date();
+    date.setDate(date.getDate() + d);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  const date = d instanceof Date ? d : new Date();
+  return date.toISOString().slice(0, 10);
 }
 
 export function getGreeting() {
@@ -230,6 +239,19 @@ export const PWIcon2 = {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <path d="M9 4L7.5 6H4C2.9 6 2 6.9 2 8V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6H16.5L15 4H9Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round"/>
       <circle cx="12" cy="13" r="4" stroke={color} strokeWidth="1.6"/>
+    </svg>
+  ),
+  plate: (size = 20, color = T.inkFaint) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <ellipse cx="12" cy="14" rx="9" ry="5" stroke={color} strokeWidth="1.6"/>
+      <path d="M3 14c0 2.8 4 5 9 5s9-2.2 9-5" stroke={color} strokeWidth="1.6"/>
+      <path d="M12 4v4M9 5.5C9 5.5 8 8 12 8s3-2.5 3-2.5" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  share: (size = 14, color = T.green) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M12 3v12M8 7l4-4 4 4" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
 };

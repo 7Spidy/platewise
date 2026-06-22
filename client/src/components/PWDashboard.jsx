@@ -13,22 +13,34 @@ function detectMealType() {
   return 'dinner';
 }
 
+function stepperLabel(dateOffset) {
+  const date = new Date();
+  date.setDate(date.getDate() + dateOffset);
+  if (dateOffset === 0) {
+    return 'Today, ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+  if (dateOffset === -1) {
+    return 'Yesterday, ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+  return date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
 export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMeal, refreshSignal }) {
-  const [meals, setMeals]         = useState(null);
-  const [savedMeals, setSavedMeals] = useState([]);
-  const [settings, setSettings]   = useState(null);
+  const [dateOffset, setDateOffset]     = useState(0);
+  const [meals, setMeals]               = useState(null);
+  const [savedMeals, setSavedMeals]     = useState([]);
+  const [settings, setSettings]         = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [draftTargets, setDraftTargets] = useState(null);
-  const [busyChip, setBusyChip]   = useState(null);
-  const [error, setError]         = useState(null);
+  const [busyChip, setBusyChip]         = useState(null);
+  const [error, setError]               = useState(null);
 
-  const greeting = getGreeting();
-  const dateLabel = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const isReadOnly = dateOffset !== 0;
 
   const load = async () => {
     try {
       const [mealsRes, savedRes, settingsRes] = await Promise.all([
-        fetch(`/api/meals?date=${isoDate()}`),
+        fetch(`/api/meals?date=${isoDate(dateOffset)}`),
         fetch('/api/saved-meals'),
         fetch('/api/settings'),
       ]);
@@ -40,7 +52,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     }
   };
 
-  useEffect(() => { load(); }, [refreshSignal]);
+  useEffect(() => { load(); }, [refreshSignal, dateOffset]);
 
   const totals = useMemo(() => {
     const m = meals || [];
@@ -75,6 +87,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
   }, [meals]);
 
   const onQuickAdd = async (saved) => {
+    if (isReadOnly) return;
     setBusyChip(saved.id);
     try {
       await fetch('/api/saved-meals', {
@@ -113,7 +126,12 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
           targetFatG:     Number(draftTargets.target_fat_g),
         }),
       });
-      if (res.ok) setSettings(await res.json());
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        setError(b.error || 'Could not save targets');
+        return;
+      }
+      setSettings(await res.json());
       setShowSettings(false);
     } catch {
       setError('Could not save targets');
@@ -137,9 +155,8 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
             fontSize: 24, fontWeight: 700, color: T.ink,
             letterSpacing: '-0.3px', lineHeight: 1.2,
           }}>
-            {greeting}
+            {getGreeting()}
           </div>
-          <div style={{ fontSize: 12, color: T.inkMute, marginTop: 3 }}>{dateLabel}</div>
         </div>
         <button
           onClick={() => { setDraftTargets({ ...targets }); setShowSettings(true); }}
@@ -151,6 +168,56 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
           {PWIcon2.gear(16)}
         </button>
       </div>
+
+      {/* ── Date Stepper ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 16,
+      }}>
+        <button
+          onClick={() => setDateOffset((o) => o - 1)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+        >
+          {PWIcon2.chevLeft(20, T.green)}
+        </button>
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: T.inkSoft }}>
+          {stepperLabel(dateOffset)}
+        </span>
+        <button
+          onClick={() => setDateOffset((o) => Math.min(0, o + 1))}
+          disabled={dateOffset === 0}
+          style={{
+            background: 'none', border: 'none', cursor: dateOffset === 0 ? 'default' : 'pointer',
+            padding: 4, opacity: dateOffset === 0 ? 0.3 : 1,
+            pointerEvents: dateOffset === 0 ? 'none' : 'auto',
+          }}
+        >
+          {PWIcon2.chevRight(20, T.green)}
+        </button>
+      </div>
+
+      {/* ── Read-only banner ── */}
+      {isReadOnly && (
+        <div style={{
+          background: T.amber50, border: `1px solid ${T.amber}`, borderRadius: 12,
+          padding: '10px 14px', marginBottom: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+        }}>
+          <span style={{ fontSize: 12.5, color: T.amber, fontWeight: 500 }}>
+            📅 Viewing a past day, read only
+          </span>
+          <button
+            onClick={() => setDateOffset(0)}
+            style={{
+              background: T.amber, color: '#fff', border: 'none', borderRadius: 8,
+              padding: '5px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+              fontFamily: T.font, whiteSpace: 'nowrap',
+            }}
+          >
+            Back to today
+          </button>
+        </div>
+      )}
 
       {error && (
         <div style={{ color: T.red, fontSize: 12.5, marginBottom: 10 }}>{error}</div>
@@ -205,8 +272,8 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         ))}
       </div>
 
-      {/* ── Quick Add ── */}
-      {quickAddChips.length > 0 && (
+      {/* ── Quick Add (hidden in read-only mode) ── */}
+      {!isReadOnly && quickAddChips.length > 0 && (
         <div style={{ marginBottom: 22 }}>
           <div style={sectionLabelStyle}>Quick Add</div>
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
@@ -237,7 +304,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
           background: '#fff', border: `1px solid ${T.lineSoft}`, borderRadius: 16,
           padding: '24px 20px', textAlign: 'center', color: T.inkMute, fontSize: 13,
         }}>
-          Nothing logged yet today — tap + to add your first meal.
+          {isReadOnly ? 'No meals logged on this day.' : 'Nothing logged yet today — tap + to add your first meal.'}
         </div>
       )}
       {meals && meals.length > 0 && (
@@ -255,15 +322,17 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
                   <div style={{ fontSize: 11, fontWeight: 700, color: T.inkMute, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
                     {MEAL_LABELS[type]}
                   </div>
-                  <button onClick={onAddMeal} style={{
-                    width: 22, height: 22, background: entries.length ? T.green : T.lineSoft,
-                    borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', cursor: 'pointer',
-                  }}>
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                      <path d="M5 2v6M2 5h6" stroke={entries.length ? '#fff' : T.inkFaint} strokeWidth="1.6" strokeLinecap="round"/>
-                    </svg>
-                  </button>
+                  {!isReadOnly && (
+                    <button onClick={onAddMeal} style={{
+                      width: 22, height: 22, background: entries.length ? T.green : T.lineSoft,
+                      borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', cursor: 'pointer',
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M5 2v6M2 5h6" stroke={entries.length ? '#fff' : T.inkFaint} strokeWidth="1.6" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  )}
                 </div>
                 {entries.length > 0 ? entries.map((m) => (
                   <button key={m.id} onClick={() => onEditMeal && onEditMeal(m)} style={{
@@ -307,15 +376,16 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
           }}>
             <div style={{ fontFamily: T.heading, fontSize: 18, fontWeight: 700, color: T.ink }}>Daily Targets</div>
             {[
-              ['target_calories', 'Calories (kcal)'],
-              ['target_protein_g', 'Protein (g)'],
-              ['target_carbs_g', 'Carbs (g)'],
-              ['target_fat_g', 'Fat (g)'],
-            ].map(([key, label]) => (
+              ['target_calories', 'Calories (kcal)', 800],
+              ['target_protein_g', 'Protein (g)', 20],
+              ['target_carbs_g', 'Carbs (g)', 20],
+              ['target_fat_g', 'Fat (g)', 10],
+            ].map(([key, label, minVal]) => (
               <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <label style={{ fontSize: 11, color: T.inkMute, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</label>
                 <input
                   type="number"
+                  min={minVal}
                   value={draftTargets[key]}
                   onChange={(e) => setDraftTargets((d) => ({ ...d, [key]: e.target.value }))}
                   style={{

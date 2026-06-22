@@ -123,7 +123,9 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
       </Field>
 
       {/* Photo area */}
-      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+      <input ref={fileRef} type="file" accept="image/*" onChange={onFile}
+        {...(tab === 'photo' ? { capture: 'environment' } : {})}
+        style={{ display: 'none' }} />
       {photo ? (
         <div onClick={() => fileRef.current?.click()} style={{
           position: 'relative', height: 150, borderRadius: 14, overflow: 'hidden',

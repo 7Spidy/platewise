@@ -1,6 +1,7 @@
 // api/saved-meals.js
 import { sql } from '@vercel/postgres';
 import { requireAuth } from '../lib/auth.js';
+import { validateMealWritePayload } from '../lib/schema.js';
 
 export default async function handler(req, res) {
   if (!requireAuth(req, res)) return;
@@ -11,15 +12,18 @@ export default async function handler(req, res) {
       return res.status(200).json(rows);
     } catch (err) {
       console.error('GET /api/saved-meals failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
   if (req.method === 'POST') {
     const { name, photoUrl, ingredients, calories, proteinG, carbsG, fatG, fiberG, sodiumMg, sugarG } = req.body || {};
-    if (!name || typeof calories !== 'number') {
-      return res.status(400).json({ error: 'name and calories are required' });
+
+    const payloadErrors = validateMealWritePayload({ name, calories, ingredients });
+    if (payloadErrors.length > 0) {
+      return res.status(400).json({ error: payloadErrors.join('; ') });
     }
+
     try {
       const { rows } = await sql`
         insert into saved_meals
@@ -33,7 +37,7 @@ export default async function handler(req, res) {
       return res.status(201).json(rows[0]);
     } catch (err) {
       console.error('POST /api/saved-meals failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
@@ -43,7 +47,6 @@ export default async function handler(req, res) {
 
     try {
       if (bumpUse) {
-        // Quick-Add tap: just increment use_count / last_used_at, leave nutrition fields alone
         const { rows } = await sql`
           update saved_meals set use_count = use_count + 1, last_used_at = now()
           where id = ${id}
@@ -51,6 +54,11 @@ export default async function handler(req, res) {
         `;
         if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
         return res.status(200).json(rows[0]);
+      }
+
+      const payloadErrors = validateMealWritePayload({ name, calories, ingredients });
+      if (payloadErrors.length > 0) {
+        return res.status(400).json({ error: payloadErrors.join('; ') });
       }
 
       const { rows } = await sql`
@@ -66,7 +74,7 @@ export default async function handler(req, res) {
       return res.status(200).json(rows[0]);
     } catch (err) {
       console.error('PATCH /api/saved-meals failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
@@ -78,7 +86,7 @@ export default async function handler(req, res) {
       return res.status(204).end();
     } catch (err) {
       console.error('DELETE /api/saved-meals failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 

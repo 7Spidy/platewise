@@ -1,11 +1,13 @@
 // client/src/components/PWLibrary.jsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { T, PWIcon2, BottomNav } from '../tokens.jsx';
+import PWConfirm from './PWConfirm.jsx';
 
 export default function PWLibrary({ onHome, onAddMeal, onHistory, onBack }) {
   const [meals, setMeals]   = useState([]);
   const [search, setSearch] = useState('');
   const [error, setError]   = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null); // { type, id, name }
 
   const load = async () => {
     try {
@@ -23,11 +25,20 @@ export default function PWLibrary({ onHome, onAddMeal, onHistory, onBack }) {
     [meals, search]
   );
 
-  const deleteMeal = async (id) => {
-    await fetch('/api/saved-meals', {
-      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
+  const handleConfirmDelete = async () => {
+    if (!confirmTarget) return;
+    if (confirmTarget.type === 'meal') {
+      await fetch('/api/saved-meals', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: confirmTarget.id }),
+      });
+    } else if (confirmTarget.type === 'ingredient') {
+      await fetch('/api/saved-ingredients', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: confirmTarget.id }),
+      });
+    }
+    setConfirmTarget(null);
     load();
   };
 
@@ -75,7 +86,10 @@ export default function PWLibrary({ onHome, onAddMeal, onHistory, onBack }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.ink }}>{Math.round(m.calories)} cal</div>
-              <button onClick={() => deleteMeal(m.id)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+              <button
+                onClick={() => setConfirmTarget({ type: 'meal', id: m.id, name: m.name })}
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
                 {PWIcon2.trash(14)}
               </button>
             </div>
@@ -88,6 +102,15 @@ export default function PWLibrary({ onHome, onAddMeal, onHistory, onBack }) {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation */}
+      <PWConfirm
+        open={!!confirmTarget}
+        title="Delete from library?"
+        message={confirmTarget ? `"${confirmTarget.name}" will be permanently removed. This can't be undone.` : ''}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmTarget(null)}
+      />
 
       {/* Bottom Nav */}
       <BottomNav

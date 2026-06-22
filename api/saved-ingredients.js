@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       return res.status(200).json(rows);
     } catch (err) {
       console.error('GET /api/saved-ingredients failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       return res.status(201).json(rows[0]);
     } catch (err) {
       console.error('POST /api/saved-ingredients failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
       return res.status(200).json(rows[0]);
     } catch (err) {
       console.error('PATCH /api/saved-ingredients failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
       return res.status(204).end();
     } catch (err) {
       console.error('DELETE /api/saved-ingredients failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
