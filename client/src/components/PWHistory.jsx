@@ -67,10 +67,12 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
     return T.red;
   };
 
-  // Build full 7-day week, most recent first
+  // Build week rows: for the current week, stop at today (future dates hidden)
+  const today = isoDate(new Date());
   const allDays = [];
   for (let i = 0; i < 7; i++) {
     const d = isoDate(addDays(weekStart, i));
+    if (isAtCurrentWeek && d > today) continue;
     const existing = (days || []).find((x) => x.date === d);
     allDays.push(existing || { date: d, total_calories: 0, meals: [] });
   }
