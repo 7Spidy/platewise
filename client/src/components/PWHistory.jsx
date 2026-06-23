@@ -34,6 +34,7 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
   const [error, setError]               = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null);
   const [viewingMeal, setViewingMeal]     = useState(null);
+  const [showTrend, setShowTrend]         = useState(false);
 
   const load = async () => {
     try {
@@ -101,7 +102,7 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
       {/* 7D / 30D toggle */}
       <div style={{ display: 'flex', gap: 8 }}>
         {[7, 30].map((r) => (
-          <button key={r} onClick={() => setRange(r)} style={{
+          <button key={r} onClick={() => { setRange(r); setShowTrend(false); }} style={{
             padding: '7px 18px', borderRadius: 20, border: 'none', cursor: 'pointer',
             fontFamily: T.font, fontSize: 12.5, fontWeight: 700,
             background: range === r ? T.green : T.lineSoft,
@@ -113,9 +114,36 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
         ))}
       </div>
 
-      {/* Trend chart */}
-      {days !== null && (
+      {/* Trend chart — collapsed placeholder */}
+      {days !== null && !showTrend && (
+        <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.line}`, boxShadow: T.shadowSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 0' }}>
+          <button onClick={() => setShowTrend(true)} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: T.font, fontSize: 13, fontWeight: 600, color: T.inkMute,
+            padding: '4px 12px',
+          }}>
+            Show Trend
+            {PWIcon2.chevDown(11, T.inkMute)}
+          </button>
+        </div>
+      )}
+
+      {/* Trend chart — expanded */}
+      {days !== null && showTrend && (
         <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.line}`, padding: '14px 6px 10px', boxShadow: T.shadowSoft }}>
+          {/* Hide Trend header */}
+          <button onClick={() => setShowTrend(false)} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: T.font, fontSize: 13, fontWeight: 600, color: T.inkMute,
+            paddingLeft: 10, marginBottom: 8,
+          }}>
+            Hide Trend
+            <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>
+              {PWIcon2.chevDown(11, T.inkMute)}
+            </span>
+          </button>
           {/* Custom legend */}
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', paddingLeft: 10, marginBottom: 10 }}>
             {LEGEND.map(({ label, color, dash }) => (
