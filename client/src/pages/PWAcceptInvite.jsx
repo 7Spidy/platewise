@@ -14,7 +14,7 @@ export default function PWAcceptInvite() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`/api/invite?token=${encodeURIComponent(token)}`)
+    fetch(`/api/public/invite/${encodeURIComponent(token)}`)
       .then(async (r) => {
         if (!r.ok) { setValid(false); return; }
         const data = await r.json();
@@ -37,10 +37,10 @@ export default function PWAcceptInvite() {
     }
     setLoading(true);
     try {
-      const r = await fetch('/api/invite', {
+      const r = await fetch(`/api/public/invite/${encodeURIComponent(token)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password, name: name.trim() || undefined }),
+        body: JSON.stringify({ password, name: name.trim() || undefined }),
       });
       const data = await r.json();
       if (!r.ok) {

@@ -11,7 +11,7 @@ export default function PWFeedbackSheet({ mealLogId, mealName, onClose }) {
     if (!message.trim()) return;
     setStatus('loading');
     try {
-      const r = await fetch('/api/feedback', {
+      const r = await fetch('/api/me/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

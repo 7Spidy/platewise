@@ -14,7 +14,7 @@ export default function PWForgotPassword() {
     setError('');
     setLoading(true);
     try {
-      const r = await fetch('/api/auth-forgot-password', {
+      const r = await fetch('/api/public/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

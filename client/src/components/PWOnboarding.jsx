@@ -52,7 +52,7 @@ export default function PWOnboarding({ onComplete }) {
     setError('');
     setLoading(true);
     try {
-      const r = await fetch('/api/onboarding', {
+      const r = await fetch('/api/me/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

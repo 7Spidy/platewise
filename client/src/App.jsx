@@ -77,7 +77,7 @@ function RequireAuth({ children, requireAdmin = false }) {
   const [status, setStatus] = useState('checking'); // checking | ok | unauthed | notAdmin | needsOnboarding
 
   useEffect(() => {
-    fetch('/api/auth-me')
+    fetch('/api/me/session')
       .then((r) => r.ok ? r.json() : Promise.reject(r.status))
       .then((user) => {
         if (requireAdmin && user.role !== 'admin') {
