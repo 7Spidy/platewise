@@ -9,6 +9,7 @@ import crypto from 'crypto';
 export default async function handler(req, res) {
   const slug = Array.isArray(req.query.slug) ? req.query.slug : (req.query.slug ? [req.query.slug] : []);
   const [route, token] = slug;
+  console.log('DEBUG public route:', { method: req.method, url: req.url, query: req.query, slug, route });
 
   // POST /api/public/login
   if (route === 'login' && req.method === 'POST') {
