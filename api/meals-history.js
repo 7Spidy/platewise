@@ -1,6 +1,6 @@
 // api/meals-history.js
 import { sql } from '@vercel/postgres';
-import { requireAuth } from '../lib/auth.js';
+import { requireAuth } from './lib/auth.js';
 import { dateRange } from '../lib/date.js';
 
 export default async function handler(req, res) {
@@ -24,7 +24,8 @@ export default async function handler(req, res) {
              photo_url, meal_type, ingredients,
              (created_at + interval '5 hours 30 minutes')::date::text as ist_date
       from meal_logs
-      where (created_at + interval '5 hours 30 minutes')::date >= ${start}::date
+      where user_id = ${req.user.id}
+        and (created_at + interval '5 hours 30 minutes')::date >= ${start}::date
         and (created_at + interval '5 hours 30 minutes')::date <= ${end}::date
       order by created_at asc
     `;

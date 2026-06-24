@@ -1,6 +1,6 @@
 // api/settings.js
 import { sql } from '@vercel/postgres';
-import { requireAuth } from '../lib/auth.js';
+import { requireAuth } from './lib/auth.js';
 
 // Returns null when valid; returns { field, message } on the first violation.
 export function validateTargets({ targetCalories, targetProteinG, targetCarbsG, targetFatG } = {}) {
@@ -16,11 +16,16 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const { rows } = await sql`select * from settings where id = 1`;
+      const { rows } = await sql`select * from user_settings where user_id = ${req.user.id}`;
       if (rows.length === 0) {
+        // Return defaults if not yet set up
         return res.status(200).json({
-          id: 1, target_calories: 2200, target_protein_g: 180,
-          target_carbs_g: 200, target_fat_g: 70,
+          user_id: req.user.id,
+          calorie_target: 2200,
+          macro_protein_g: 180,
+          macro_carbs_g: 200,
+          macro_fat_g: 70,
+          manually_edited: false,
         });
       }
       return res.status(200).json(rows[0]);
@@ -38,11 +43,15 @@ export default async function handler(req, res) {
 
     try {
       const { rows } = await sql`
-        update settings set
-          target_calories = ${targetCalories}, target_protein_g = ${targetProteinG},
-          target_carbs_g = ${targetCarbsG}, target_fat_g = ${targetFatG},
-          updated_at = now()
-        where id = 1
+        insert into user_settings (user_id, calorie_target, macro_protein_g, macro_carbs_g, macro_fat_g, manually_edited, updated_at)
+        values (${req.user.id}, ${targetCalories}, ${targetProteinG}, ${targetCarbsG}, ${targetFatG}, true, now())
+        on conflict (user_id) do update set
+          calorie_target  = excluded.calorie_target,
+          macro_protein_g = excluded.macro_protein_g,
+          macro_carbs_g   = excluded.macro_carbs_g,
+          macro_fat_g     = excluded.macro_fat_g,
+          manually_edited = true,
+          updated_at      = now()
         returning *
       `;
       return res.status(200).json(rows[0]);

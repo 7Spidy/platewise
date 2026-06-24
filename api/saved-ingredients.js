@@ -1,13 +1,13 @@
 // api/saved-ingredients.js
 import { sql } from '@vercel/postgres';
-import { requireAuth } from '../lib/auth.js';
+import { requireAuth } from './lib/auth.js';
 
 export default async function handler(req, res) {
   if (!requireAuth(req, res)) return;
 
   if (req.method === 'GET') {
     try {
-      const { rows } = await sql`select * from saved_ingredients order by name asc`;
+      const { rows } = await sql`select * from saved_ingredients where user_id = ${req.user.id} order by name asc`;
       return res.status(200).json(rows);
     } catch (err) {
       console.error('GET /api/saved-ingredients failed:', err);
@@ -23,9 +23,9 @@ export default async function handler(req, res) {
     try {
       const { rows } = await sql`
         insert into saved_ingredients
-          (name, default_unit, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, sugar_g)
+          (user_id, name, default_unit, calories, protein_g, carbs_g, fat_g, fiber_g, sodium_mg, sugar_g)
         values
-          (${name}, ${defaultUnit ?? null}, ${calories},
+          (${req.user.id}, ${name}, ${defaultUnit ?? null}, ${calories},
            ${proteinG ?? 0}, ${carbsG ?? 0}, ${fatG ?? 0},
            ${fiberG ?? 0}, ${sodiumMg ?? 0}, ${sugarG ?? 0})
         returning *
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
           name = ${name}, default_unit = ${defaultUnit ?? null}, calories = ${calories},
           protein_g = ${proteinG ?? 0}, carbs_g = ${carbsG ?? 0}, fat_g = ${fatG ?? 0},
           fiber_g = ${fiberG ?? 0}, sodium_mg = ${sodiumMg ?? 0}, sugar_g = ${sugarG ?? 0}
-        where id = ${id}
+        where id = ${id} and user_id = ${req.user.id}
         returning *
       `;
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id is required' });
     try {
-      await sql`delete from saved_ingredients where id = ${id}`;
+      await sql`delete from saved_ingredients where id = ${id} and user_id = ${req.user.id}`;
       return res.status(204).end();
     } catch (err) {
       console.error('DELETE /api/saved-ingredients failed:', err);
