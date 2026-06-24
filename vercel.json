@@ -6,6 +6,24 @@
   "functions": {
     "api/analyze.js": {
       "maxDuration": 30
+    },
+    "api/auth-forgot-password.js": {
+      "maxDuration": 10
+    },
+    "api/auth-reset-password.js": {
+      "maxDuration": 10
+    },
+    "api/invite.js": {
+      "maxDuration": 10
+    },
+    "api/onboarding.js": {
+      "maxDuration": 10
+    },
+    "api/admin/whitelist.js": {
+      "maxDuration": 10
+    },
+    "api/admin/waitlist.js": {
+      "maxDuration": 10
     }
   },
   "rewrites": [

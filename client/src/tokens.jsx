@@ -59,12 +59,13 @@ export function isoDate(d) {
   return date.toISOString().slice(0, 10);
 }
 
-export function getGreeting() {
+export function getGreeting(name = '') {
   const h = new Date().getHours();
-  if (h >= 5 && h < 12) return 'Good morning, Avi';
-  if (h >= 12 && h < 17) return 'Good afternoon, Avi';
-  if (h >= 17 && h < 21) return 'Good evening, Avi';
-  return 'Good night, Avi';
+  const greeting = h >= 5 && h < 12 ? 'Good morning'
+    : h >= 12 && h < 17 ? 'Good afternoon'
+    : h >= 17 && h < 21 ? 'Good evening'
+    : 'Good night';
+  return name ? `${greeting}, ${name}` : greeting;
 }
 
 export function compressImage(file, maxPx = 600) {

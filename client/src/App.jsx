@@ -1,21 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import PWLock     from './components/PWLock.jsx';
-import PWDashboard from './components/PWDashboard.jsx';
-import PWAddMeal  from './components/PWAddMeal.jsx';
-import PWReview   from './components/PWReview.jsx';
-import PWLibrary  from './components/PWLibrary.jsx';
-import PWHistory  from './components/PWHistory.jsx';
-import PWEditMeal from './components/PWEditMeal.jsx';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import PWDashboard   from './components/PWDashboard.jsx';
+import PWAddMeal     from './components/PWAddMeal.jsx';
+import PWReview      from './components/PWReview.jsx';
+import PWLibrary     from './components/PWLibrary.jsx';
+import PWHistory     from './components/PWHistory.jsx';
+import PWEditMeal    from './components/PWEditMeal.jsx';
+import PWOnboarding  from './components/PWOnboarding.jsx';
+import PWAdmin       from './components/PWAdmin.jsx';
+import PWLanding     from './pages/PWLanding.jsx';
+import PWLogin       from './pages/PWLogin.jsx';
+import PWForgotPassword  from './pages/PWForgotPassword.jsx';
+import PWResetPassword   from './pages/PWResetPassword.jsx';
+import PWAcceptInvite    from './pages/PWAcceptInvite.jsx';
 import { PW_TOKENS, T } from './tokens.jsx';
 
-// Re-exported for backward compatibility
 export { PW_TOKENS };
 
 const HOW_IT_WORKS_STEPS = [
-  { n: '01', t: 'Add a meal',        d: 'Snap a photo or just describe what you ate — both work, with or without a photo attached.' },
+  { n: '01', t: 'Add a meal',           d: 'Snap a photo or just describe what you ate — both work, with or without a photo attached.' },
   { n: '02', t: 'Claude does the math', d: 'Claude vision breaks the meal into ingredients and estimates calories, macros, and micros.' },
-  { n: '03', t: 'Review & tweak',    d: 'Adjust any ingredient quantity and Claude recalculates the nutrition instantly.' },
-  { n: '04', t: 'Save & track',      d: 'It lands on your Dashboard under the right meal type, with rings tracking your daily targets.' },
+  { n: '03', t: 'Review & tweak',       d: 'Adjust any ingredient quantity and Claude recalculates the nutrition instantly.' },
+  { n: '04', t: 'Save & track',         d: 'It lands on your Dashboard under the right meal type, with rings tracking your daily targets.' },
 ];
 
 function PWHowItWorks({ onClose }) {
@@ -65,8 +71,35 @@ function PWHowItWorks({ onClose }) {
   );
 }
 
-export default function App() {
-  const [authed, setAuthed]           = useState(null);
+// ── RequireAuth wrapper ──────────────────────────────────────────────────────
+function RequireAuth({ children, requireAdmin = false }) {
+  const navigate = useNavigate();
+  const [status, setStatus] = useState('checking'); // checking | ok | unauthed | notAdmin | needsOnboarding
+
+  useEffect(() => {
+    fetch('/api/auth-me')
+      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+      .then((user) => {
+        if (requireAdmin && user.role !== 'admin') {
+          setStatus('notAdmin');
+        } else if (!user.onboarding_completed_at && user.role !== 'admin') {
+          setStatus('needsOnboarding');
+        } else {
+          setStatus('ok');
+        }
+      })
+      .catch(() => setStatus('unauthed'));
+  }, [requireAdmin]);
+
+  if (status === 'checking') return <div style={{ minHeight: '100vh', background: T.bg }} />;
+  if (status === 'unauthed') return <Navigate to="/login" replace />;
+  if (status === 'notAdmin') return <Navigate to="/app" replace />;
+  if (status === 'needsOnboarding') return <Navigate to="/onboarding" replace />;
+  return children;
+}
+
+// ── Authenticated app shell (state-switched internally, no route change) ────
+function AppShell() {
   const [view, setView]               = useState('dashboard');
   const [reviewData, setReviewData]   = useState(null);
   const [reviewDraft, setReviewDraft] = useState(null);
@@ -81,16 +114,6 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  useEffect(() => {
-    fetch('/api/auth')
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setAuthed(!!d.authenticated))
-      .catch(() => setAuthed(false));
-  }, []);
-
-  if (authed === null) return <div style={{ minHeight: '100vh', background: T.bg }} />;
-  if (authed === false) return <PWLock onUnlock={() => setAuthed(true)} />;
-
   const goDashboard = () => {
     setView('dashboard');
     setReviewData(null);
@@ -99,9 +122,9 @@ export default function App() {
     setRefreshSignal((s) => s + 1);
   };
 
-  const goHistory = () => setView('history');
-  const goLibrary = () => setView('library');
-  const goAddMeal = () => setView('addMeal');
+  const goHistory  = () => setView('history');
+  const goLibrary  = () => setView('library');
+  const goAddMeal  = () => setView('addMeal');
 
   const onAnalyzed = (data, draft) => {
     setReviewData(data);
@@ -116,43 +139,22 @@ export default function App() {
 
   const isSplitStep = view === 'addMeal' || view === 'review';
 
-  // ── Common nav props passed to components that host the BottomNav ──
-  const navProps = {
-    onHome:    goDashboard,
-    onAddMeal: goAddMeal,
-    onHistory: goHistory,
-    onLibrary: goLibrary,
-  };
-
   let mainContent = null;
   if (view === 'dashboard') {
     mainContent = (
       <PWDashboard
-        onAddMeal={goAddMeal}
-        onHistory={goHistory}
-        onLibrary={goLibrary}
-        onEditMeal={onEditMeal}
+        onAddMeal={goAddMeal} onHistory={goHistory}
+        onLibrary={goLibrary} onEditMeal={onEditMeal}
         refreshSignal={refreshSignal}
       />
     );
   } else if (view === 'library') {
     mainContent = (
-      <PWLibrary
-        onBack={goDashboard}
-        onHome={goDashboard}
-        onAddMeal={goAddMeal}
-        onHistory={goHistory}
-      />
+      <PWLibrary onBack={goDashboard} onHome={goDashboard} onAddMeal={goAddMeal} onHistory={goHistory} />
     );
   } else if (view === 'history') {
     mainContent = (
-      <PWHistory
-        onBack={goDashboard}
-        onHome={goDashboard}
-        onAddMeal={goAddMeal}
-        onLibrary={goLibrary}
-        onEditMeal={onEditMeal}
-      />
+      <PWHistory onBack={goDashboard} onHome={goDashboard} onAddMeal={goAddMeal} onLibrary={goLibrary} onEditMeal={onEditMeal} />
     );
   } else if (view === 'editMeal') {
     mainContent = <PWEditMeal meal={editingMeal} onBack={goDashboard} onSaved={goDashboard} />;
@@ -160,16 +162,10 @@ export default function App() {
     mainContent = <PWAddMeal onClose={goDashboard} onAnalyzed={onAnalyzed} />;
   } else if (view === 'review') {
     mainContent = (
-      <PWReview
-        data={reviewData}
-        draft={reviewDraft}
-        onBack={() => setView('addMeal')}
-        onSaved={goDashboard}
-      />
+      <PWReview data={reviewData} draft={reviewDraft} onBack={() => setView('addMeal')} onSaved={goDashboard} />
     );
   }
 
-  // ── Desktop: side-by-side Add + Review ──
   if (isSplitStep && isDesktop) {
     return (
       <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', justifyContent: 'center', padding: '40px 24px', fontFamily: T.font }}>
@@ -208,8 +204,6 @@ export default function App() {
       }}>
         {mainContent}
       </div>
-
-      {/* "How it works" hint — only on dashboard */}
       {view === 'dashboard' && (
         <button onClick={() => setShowHowItWorks(true)} style={{
           position: 'fixed', bottom: 88, left: 24,
@@ -218,8 +212,44 @@ export default function App() {
           cursor: 'pointer', fontFamily: T.font, boxShadow: T.shadowSoft, zIndex: 15,
         }}>?</button>
       )}
-
       {showHowItWorks && <PWHowItWorks onClose={() => setShowHowItWorks(false)} />}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      {/* Public routes */}
+      <Route path="/"                      element={<PWLanding />} />
+      <Route path="/login"                 element={<PWLogin />} />
+      <Route path="/forgot-password"       element={<PWForgotPassword />} />
+      <Route path="/reset-password/:token" element={<PWResetPassword />} />
+      <Route path="/invite/:token"         element={<PWAcceptInvite />} />
+
+      {/* Onboarding — auth'd but before onboarding_completed_at */}
+      <Route path="/onboarding" element={
+        <RequireAuth>
+          <PWOnboarding onComplete={() => window.location.replace('/app')} />
+        </RequireAuth>
+      } />
+
+      {/* Authenticated app */}
+      <Route path="/app/*" element={
+        <RequireAuth>
+          <AppShell />
+        </RequireAuth>
+      } />
+
+      {/* Admin dashboard */}
+      <Route path="/admin" element={
+        <RequireAuth requireAdmin={true}>
+          <PWAdmin />
+        </RequireAuth>
+      } />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

@@ -1,6 +1,6 @@
 // api/meals.js
 import { sql } from '@vercel/postgres';
-import { requireAuth } from '../lib/auth.js';
+import { requireAuth } from './lib/auth.js';
 import { uploadMealPhoto, deleteMealPhoto } from '../lib/blob.js';
 import { validateMealWritePayload } from '../lib/schema.js';
 
@@ -16,7 +16,8 @@ export default async function handler(req, res) {
                  fiber_g, sugar_g, sodium_mg, health_score, fact, tips, mismatch,
                  photo_url, meal_type, ingredients
           from meal_logs
-          where (created_at + interval '5 hours 30 minutes')::date = ${date}::date
+          where user_id = ${req.user.id}
+            and (created_at + interval '5 hours 30 minutes')::date = ${date}::date
           order by created_at asc
         `;
         return res.status(200).json(rows);
@@ -27,6 +28,7 @@ export default async function handler(req, res) {
                fiber_g, sugar_g, sodium_mg, health_score, fact, tips, mismatch,
                photo_url, meal_type, ingredients
         from meal_logs
+        where user_id = ${req.user.id}
         order by created_at desc
         limit 200
       `;
@@ -64,10 +66,10 @@ export default async function handler(req, res) {
     try {
       const { rows } = await sql`
         insert into meal_logs
-          (name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
+          (user_id, name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
            health_score, fact, tips, mismatch, photo_url, meal_type, ingredients, created_at)
         values
-          (${name}, ${serving ?? null}, ${ri(calories)},
+          (${req.user.id}, ${name}, ${serving ?? null}, ${ri(calories)},
            ${ri(macros.carbs)}, ${ri(macros.protein)}, ${ri(macros.fat)},
            ${ri(other.fiber)}, ${ri(other.sugar)}, ${ri(other.sodium)},
            ${ri(healthScore)}, ${fact ?? null}, ${JSON.stringify(tips ?? [])},
@@ -121,7 +123,7 @@ export default async function handler(req, res) {
           meal_type    = ${mealType ?? null},
           ingredients  = ${ingredients ? JSON.stringify(ingredients) : null},
           created_at   = ${new Date(loggedAt).toISOString()}
-        where id = ${id}
+        where id = ${id} and user_id = ${req.user.id}
         returning *
       `;
       if (rows.length === 0) return res.status(404).json({ error: 'Meal not found' });
@@ -136,11 +138,11 @@ export default async function handler(req, res) {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id is required' });
     try {
-      // Get the photo_url before deleting
-      const { rows: photoRows } = await sql`select photo_url from meal_logs where id = ${id}`;
+      // Get the photo_url before deleting — only for this user's meal
+      const { rows: photoRows } = await sql`select photo_url from meal_logs where id = ${id} and user_id = ${req.user.id}`;
       const photoUrl = photoRows[0]?.photo_url;
 
-      await sql`delete from meal_logs where id = ${id}`;
+      await sql`delete from meal_logs where id = ${id} and user_id = ${req.user.id}`;
 
       // Delete blob only if not referenced by a saved meal
       if (photoUrl) {
