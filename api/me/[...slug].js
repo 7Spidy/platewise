@@ -1,10 +1,10 @@
 import { sql } from '@vercel/postgres';
 import {
   requireAuth, clearSessionCookie,
-} from '../lib/auth.js';
-import { calcTarget, inchesToCm, lbsToKg } from '../lib/calorie.js';
-import { windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable } from '../lib/scanLimit.js';
-import { validateTargets } from '../lib/settings.js';
+} from '../../lib/auth.js';
+import { calcTarget, inchesToCm, lbsToKg } from '../../lib/calorie.js';
+import { windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable } from '../../lib/scanLimit.js';
+import { validateTargets } from '../../lib/settings.js';
 
 export default async function handler(req, res) {
   const slug = Array.isArray(req.query.slug) ? req.query.slug : (req.query.slug ? [req.query.slug] : []);

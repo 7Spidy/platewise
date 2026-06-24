@@ -1,9 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql } from '@vercel/postgres';
-import { requireAuth } from './lib/auth.js';
+import { requireAuth } from '../lib/auth.js';
 import { validateNutritionPayload } from '../lib/schema.js';
-import { windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable } from './lib/scanLimit.js';
-import { calcCost } from './lib/cost.js';
+import { windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable } from '../lib/scanLimit.js';
+import { calcCost } from '../lib/cost.js';
 
 const client = new Anthropic();
 

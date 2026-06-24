@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres';
-import { requireAdmin, generateToken } from '../lib/auth.js';
-import { sendInviteEmail } from '../lib/mailer.js';
+import { requireAdmin, generateToken } from '../../lib/auth.js';
+import { sendInviteEmail } from '../../lib/mailer.js';
 
 export default async function handler(req, res) {
   const slug = Array.isArray(req.query.slug) ? req.query.slug : (req.query.slug ? [req.query.slug] : []);

@@ -8,7 +8,7 @@ import {
   hashPassword, verifyPassword,
   signSession, verifySession,
   generateToken, createSessionCookie,
-} from '../api/lib/auth.js';
+} from '../lib/auth.js';
 
 describe('password hashing', () => {
   it('hash and verify round-trip', async () => {

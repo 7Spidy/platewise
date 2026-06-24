@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTargets } from '../api/lib/settings.js';
+import { validateTargets } from '../lib/settings.js';
 
 const valid = { targetCalories: 2000, targetProteinG: 150, targetCarbsG: 200, targetFatG: 70 };
 

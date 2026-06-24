@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { calcCostUsd, calcCostInr, calcCost } from '../api/lib/cost.js';
+import { calcCostUsd, calcCostInr, calcCost } from '../lib/cost.js';
 
 describe('calcCostUsd', () => {
   it('input tokens at $1/M', () => {

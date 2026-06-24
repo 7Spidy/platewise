@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable,
-} from '../api/lib/scanLimit.js';
+} from '../lib/scanLimit.js';
 
 const WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 

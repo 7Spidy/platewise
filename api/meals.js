@@ -1,6 +1,6 @@
 // api/meals.js
 import { sql } from '@vercel/postgres';
-import { requireAuth } from './lib/auth.js';
+import { requireAuth } from '../lib/auth.js';
 import { uploadMealPhoto, deleteMealPhoto } from '../lib/blob.js';
 import { validateMealWritePayload } from '../lib/schema.js';
 

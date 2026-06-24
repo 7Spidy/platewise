@@ -1,6 +1,6 @@
 // api/saved-meals.js
 import { sql } from '@vercel/postgres';
-import { requireAuth } from './lib/auth.js';
+import { requireAuth } from '../lib/auth.js';
 import { validateMealWritePayload } from '../lib/schema.js';
 
 export default async function handler(req, res) {

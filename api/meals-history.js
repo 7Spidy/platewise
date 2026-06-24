@@ -1,6 +1,6 @@
 // api/meals-history.js
 import { sql } from '@vercel/postgres';
-import { requireAuth } from './lib/auth.js';
+import { requireAuth } from '../lib/auth.js';
 import { dateRange } from '../lib/date.js';
 
 export default async function handler(req, res) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcBMR, calcTDEE, calcTarget, inchesToCm, lbsToKg, cmToInches, kgToLbs } from '../api/lib/calorie.js';
+import { calcBMR, calcTDEE, calcTarget, inchesToCm, lbsToKg, cmToInches, kgToLbs } from '../lib/calorie.js';
 
 describe('calcBMR', () => {
   const base = { age: 30, height_cm: 175, weight_kg: 75 };
