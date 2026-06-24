@@ -19,7 +19,7 @@ export default function PWLogin() {
       const body = mode === 'passcode'
         ? { passcode }
         : { email, password };
-      const r = await fetch('/api/auth-login', {
+      const r = await fetch('/api/public/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

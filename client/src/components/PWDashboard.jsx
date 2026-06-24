@@ -45,7 +45,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
       const [mealsRes, savedRes, settingsRes] = await Promise.all([
         fetch(`/api/meals?date=${isoDate(dateOffset)}`),
         fetch('/api/saved-meals'),
-        fetch('/api/settings'),
+        fetch('/api/me/settings'),
       ]);
       if (mealsRes.ok)    setMeals(await mealsRes.json());
       if (savedRes.ok)    setSavedMeals(await savedRes.json());
@@ -119,7 +119,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
 
   const saveTargets = async () => {
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetch('/api/me/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

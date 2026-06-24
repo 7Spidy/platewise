@@ -42,7 +42,7 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
       const end   = isoDate(0);
       const [histRes, settingsRes] = await Promise.all([
         fetch(`/api/meals-history?start=${start}&end=${end}`),
-        fetch('/api/settings'),
+        fetch('/api/me/settings'),
       ]);
       if (histRes.ok) {
         const data = await histRes.json();

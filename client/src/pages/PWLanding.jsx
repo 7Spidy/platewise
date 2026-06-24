@@ -19,7 +19,7 @@ export default function PWLanding({ onGoLogin }) {
     setStatus('loading');
     setErrorMsg('');
     try {
-      const r = await fetch('/api/waitlist', {
+      const r = await fetch('/api/public/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

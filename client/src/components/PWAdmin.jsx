@@ -39,7 +39,7 @@ export default function PWAdmin() {
       const [u, w, f, t] = await Promise.all([
         fetch('/api/admin/users').then((r) => r.json()),
         fetch('/api/admin/waitlist').then((r) => r.json()),
-        fetch('/api/feedback').then((r) => r.json()),
+        fetch('/api/admin/feedback').then((r) => r.json()),
         fetch('/api/admin/usage-trend').then((r) => r.json()),
       ]);
       setUsers(Array.isArray(u) ? u : []);

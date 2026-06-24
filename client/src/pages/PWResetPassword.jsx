@@ -12,7 +12,7 @@ export default function PWResetPassword() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`/api/auth-reset-password?token=${encodeURIComponent(token)}`)
+    fetch(`/api/public/reset-password/${encodeURIComponent(token)}`)
       .then((r) => {
         setValid(r.ok);
       })
@@ -32,10 +32,10 @@ export default function PWResetPassword() {
     }
     setLoading(true);
     try {
-      const r = await fetch('/api/auth-reset-password', {
+      const r = await fetch(`/api/public/reset-password/${encodeURIComponent(token)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ password }),
       });
       const data = await r.json();
       if (!r.ok) {
