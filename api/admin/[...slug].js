@@ -105,9 +105,15 @@ export default async function handler(req, res) {
         const expires = new Date(Date.now() + 48 * 60 * 60 * 1000);
         await sql`insert into invite_tokens (email, token_hash, expires_at) values (${rows[0].email}, ${hash}, ${expires.toISOString()})`;
         const url = `${process.env.APP_BASE_URL}/invite/${raw}`;
-        await sendInviteEmail(rows[0].email, url).catch(console.error);
+        const emailResult = await sendInviteEmail(rows[0].email, url).catch((err) => {
+          console.error('sendInviteEmail failed:', err);
+          return { error: true, message: err?.message || 'Email send failed' };
+        });
+        if (emailResult?.error) {
+          return res.status(200).json({ ok: true, emailSent: false, emailError: emailResult.message });
+        }
       }
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, emailSent: true });
     } catch (err) {
       console.error('POST /api/admin/waitlist failed:', err);
       return res.status(500).json({ error: 'Something went wrong' });
@@ -126,8 +132,11 @@ export default async function handler(req, res) {
       const expires = new Date(Date.now() + 48 * 60 * 60 * 1000);
       await sql`insert into invite_tokens (email, token_hash, expires_at) values (${normalized}, ${hash}, ${expires.toISOString()})`;
       const url = `${process.env.APP_BASE_URL}/invite/${raw}`;
-      await sendInviteEmail(normalized, url).catch(console.error);
-      return res.status(201).json({ ok: true });
+      const emailResult = await sendInviteEmail(normalized, url).catch((err) => {
+        console.error('sendInviteEmail failed:', err);
+        return { error: true, message: err?.message || 'Email send failed' };
+      });
+      return res.status(201).json({ ok: true, emailSent: !emailResult?.error, ...(emailResult?.error && { emailError: emailResult.message }) });
     } catch (err) {
       console.error('POST /api/admin/whitelist failed:', err);
       return res.status(500).json({ error: 'Something went wrong' });

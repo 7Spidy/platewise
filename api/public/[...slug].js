@@ -94,7 +94,9 @@ export default async function handler(req, res) {
           values (${rows[0].id}, ${hash}, ${expires.toISOString()})
         `;
         const url = `${process.env.APP_BASE_URL}/reset-password/${raw}`;
-        await sendResetEmail(email.toLowerCase().trim(), url).catch(console.error);
+        await sendResetEmail(email.toLowerCase().trim(), url).catch((err) => {
+          console.error('sendResetEmail failed:', err);
+        });
       }
     } catch (err) {
       console.error('POST /api/public/forgot-password failed:', err);

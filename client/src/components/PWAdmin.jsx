@@ -63,11 +63,17 @@ export default function PWAdmin() {
   const pending     = waitlist.filter((w) => w.status === 'pending');
 
   async function handleWaitlistAction(id, action) {
-    await fetch('/api/admin/waitlist', {
+    const r = await fetch('/api/admin/waitlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, action }),
     });
+    if (action === 'approve') {
+      const d = await r.json();
+      if (d.emailSent === false) {
+        setAddMsg(`Approved, but invite email failed to send: ${d.emailError ?? 'unknown error'}`);
+      }
+    }
     load();
   }
 
@@ -80,7 +86,13 @@ export default function PWAdmin() {
       body: JSON.stringify({ email: addEmail }),
     });
     const d = await r.json();
-    setAddMsg(r.ok ? 'Invite sent!' : (d.error ?? 'Error'));
+    if (!r.ok) {
+      setAddMsg(d.error ?? 'Error');
+    } else if (d.emailSent === false) {
+      setAddMsg(`Invite created, but email failed to send: ${d.emailError ?? 'unknown error'}`);
+    } else {
+      setAddMsg('Invite sent!');
+    }
     if (r.ok) setAddEmail('');
   }
 
