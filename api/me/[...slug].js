@@ -7,7 +7,8 @@ import { windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable } f
 import { validateTargets } from '../../lib/settings.js';
 
 export default async function handler(req, res) {
-  const slug = Array.isArray(req.query.slug) ? req.query.slug : (req.query.slug ? [req.query.slug] : []);
+  const rawSlug = req.query.slug ?? req.query['...slug'];
+  const slug = Array.isArray(rawSlug) ? rawSlug : (rawSlug ? [rawSlug] : []);
   const [route] = slug;
 
   // GET /api/me/session — return current user info

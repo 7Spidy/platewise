@@ -3,7 +3,8 @@ import { requireAdmin, generateToken } from '../../lib/auth.js';
 import { sendInviteEmail } from '../../lib/mailer.js';
 
 export default async function handler(req, res) {
-  const slug = Array.isArray(req.query.slug) ? req.query.slug : (req.query.slug ? [req.query.slug] : []);
+  const rawSlug = req.query.slug ?? req.query['...slug'];
+  const slug = Array.isArray(rawSlug) ? rawSlug : (rawSlug ? [rawSlug] : []);
   const [route] = slug;
 
   if (!requireAdmin(req, res)) return;
