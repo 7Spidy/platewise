@@ -1,43 +1,48 @@
 // client/src/components/PWHistory.jsx
 import React, { useEffect, useState } from 'react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { T, PWIcon2, BottomNav, isoDate } from '../tokens.jsx';
+import PWConfirm from './PWConfirm.jsx';
+import PWMealView from './PWMealView.jsx';
+import { exportMealPdf } from '../lib/exportPdf.js';
 
-function startOfWeek(d) {
-  const date = new Date(d);
-  const day = date.getDay();
-  date.setDate(date.getDate() - day);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-function addDays(d, n) {
-  const date = new Date(d);
-  date.setDate(date.getDate() + n);
-  return date;
-}
-function fmtRange(start, end) {
-  const f = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  return `${f(start)} – ${f(end)}`;
-}
 function fmtDayLabel(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, {
     weekday: 'short', month: 'short', day: 'numeric',
   });
 }
 
-export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEditMeal }) {
-  const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
-  const [days, setDays]           = useState(null);
-  const [openDay, setOpenDay]     = useState(null);
-  const [target, setTarget]       = useState(2200);
-  const [error, setError]         = useState(null);
+function fmtXTick(dateStr, range) {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (range <= 7) return d.toLocaleDateString(undefined, { weekday: 'short' });
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
-  const weekEnd = addDays(weekStart, 6);
+
+const LEGEND = [
+  { key: 'total_calories',  label: 'Calories', color: T.green,  dash: '' },
+  { key: 'total_protein_g', label: 'Protein',  color: T.sage,   dash: '5 5' },
+  { key: 'total_carbs_g',   label: 'Carbs',    color: T.amber,  dash: '2 3' },
+  { key: 'total_fat_g',     label: 'Fat',      color: T.fat,    dash: '8 3 2 3' },
+];
+
+export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEditMeal }) {
+  const [range, setRange]               = useState(7);
+  const [days, setDays]                 = useState(null);
+  const [openDay, setOpenDay]           = useState(null);
+  const [target, setTarget]             = useState(2200);
+  const [error, setError]               = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [viewingMeal, setViewingMeal]     = useState(null);
+  const [showTrend, setShowTrend]         = useState(false);
 
   const load = async () => {
     try {
+      const start = isoDate(-(range - 1));
+      const end   = isoDate(0);
       const [histRes, settingsRes] = await Promise.all([
-        fetch(`/api/meals-history?start=${isoDate(weekStart)}&end=${isoDate(weekEnd)}`),
-        fetch('/api/settings'),
+        fetch(`/api/meals-history?start=${start}&end=${end}`),
+        fetch('/api/me/settings'),
       ]);
       if (histRes.ok) {
         const data = await histRes.json();
@@ -50,30 +55,37 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
     }
   };
 
-  useEffect(() => { load(); }, [weekStart]);
+  useEffect(() => { load(); }, [range]);
 
   const calColor = (cal) => {
-    if (cal === 0)              return T.inkFaint;
-    if (cal <= target)          return T.green;
-    if (cal <= target * 1.1)    return T.amber;
+    if (cal === 0)           return T.inkFaint;
+    if (cal <= target)       return T.green;
+    if (cal <= target * 1.1) return T.amber;
     return T.red;
   };
 
   const calBarColor = (cal) => {
-    if (cal === 0)              return T.lineSoft;
-    if (cal <= target)          return T.green;
-    if (cal <= target * 1.1)    return T.amber;
+    if (cal === 0)           return T.lineSoft;
+    if (cal <= target)       return T.green;
+    if (cal <= target * 1.1) return T.amber;
     return T.red;
   };
 
-  // Build full 7-day week, most recent first
-  const allDays = [];
-  for (let i = 0; i < 7; i++) {
-    const d = isoDate(addDays(weekStart, i));
-    const existing = (days || []).find((x) => x.date === d);
-    allDays.push(existing || { date: d, total_calories: 0, meals: [] });
-  }
-  allDays.sort((a, b) => (a.date < b.date ? 1 : -1));
+  const handleDelete = async () => {
+    if (!confirmTarget) return;
+    await fetch('/api/meals', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: confirmTarget.id }),
+    });
+    setConfirmTarget(null);
+    load();
+  };
+
+  // Chart data sorted oldest-first for left-to-right rendering
+  const chartData = days ? [...days].reverse() : [];
+  // Determine tick interval for x-axis to avoid crowding
+  const tickCount = range <= 7 ? 1 : 5;
 
   return (
     <div style={{
@@ -83,26 +95,90 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
     }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 2 }}>
-        <div style={{ fontFamily: T.heading, fontSize: 24, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px' }}>
-          History
-        </div>
+      <div style={{ fontFamily: T.heading, fontSize: 24, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px' }}>
+        History
       </div>
 
-      {/* Week navigator */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: '#fff', border: `1px solid ${T.line}`, borderRadius: 12, padding: '9px 14px',
-        boxShadow: T.shadowSoft,
-      }}>
-        <button onClick={() => setWeekStart((w) => addDays(w, -7))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-          {PWIcon2.chevLeft(14, T.green)}
-        </button>
-        <span style={{ fontSize: 13, fontWeight: 600, color: T.inkSoft }}>{fmtRange(weekStart, weekEnd)}</span>
-        <button onClick={() => setWeekStart((w) => addDays(w, 7))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-          {PWIcon2.chevRight(14, T.green)}
-        </button>
+      {/* 7D / 30D toggle */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        {[7, 30].map((r) => (
+          <button key={r} onClick={() => { setRange(r); setShowTrend(false); }} style={{
+            padding: '7px 18px', borderRadius: 20, border: 'none', cursor: 'pointer',
+            fontFamily: T.font, fontSize: 12.5, fontWeight: 700,
+            background: range === r ? T.green : T.lineSoft,
+            color: range === r ? '#fff' : T.inkMute,
+            transition: 'all 0.15s ease',
+          }}>
+            {r}D
+          </button>
+        ))}
       </div>
+
+      {/* Trend chart — collapsed placeholder */}
+      {days !== null && !showTrend && (
+        <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.line}`, boxShadow: T.shadowSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 0' }}>
+          <button onClick={() => setShowTrend(true)} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: T.font, fontSize: 13, fontWeight: 600, color: T.inkMute,
+            padding: '4px 12px',
+          }}>
+            Show Trend
+            {PWIcon2.chevDown(11, T.inkMute)}
+          </button>
+        </div>
+      )}
+
+      {/* Trend chart — expanded */}
+      {days !== null && showTrend && (
+        <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.line}`, padding: '14px 6px 10px', boxShadow: T.shadowSoft }}>
+          {/* Hide Trend header */}
+          <button onClick={() => setShowTrend(false)} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontFamily: T.font, fontSize: 13, fontWeight: 600, color: T.inkMute,
+            paddingLeft: 10, marginBottom: 8,
+          }}>
+            Hide Trend
+            <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>
+              {PWIcon2.chevDown(11, T.inkMute)}
+            </span>
+          </button>
+          {/* Custom legend */}
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', paddingLeft: 10, marginBottom: 10 }}>
+            {LEGEND.map(({ label, color, dash }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <svg width="22" height="10">
+                  <line x1="0" y1="5" x2="22" y2="5" stroke={color} strokeWidth="2"
+                    strokeDasharray={dash || undefined} />
+                </svg>
+                <span style={{ fontSize: 11, color: T.inkSoft, fontWeight: 500 }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={chartData} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={T.lineSoft} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 9, fill: T.inkFaint }}
+                tickFormatter={(d) => fmtXTick(d, range)}
+                interval={tickCount - 1}
+              />
+              <YAxis yAxisId="cal" orientation="left"  tick={{ fontSize: 9, fill: T.inkFaint }} width={34} />
+              <YAxis yAxisId="grams" orientation="right" tick={{ fontSize: 9, fill: T.inkFaint }} width={28} />
+              <Tooltip
+                contentStyle={{ fontSize: 11, border: `1px solid ${T.line}`, borderRadius: 8 }}
+                labelFormatter={(d) => fmtDayLabel(d)}
+              />
+              <Line yAxisId="cal"   dataKey="total_calories"  stroke={T.green} strokeWidth={2} dot={false} />
+              <Line yAxisId="grams" dataKey="total_protein_g" stroke={T.sage}  strokeWidth={1.5} dot={false} strokeDasharray="5 5" />
+              <Line yAxisId="grams" dataKey="total_carbs_g"   stroke={T.amber} strokeWidth={1.5} dot={false} strokeDasharray="2 3" />
+              <Line yAxisId="grams" dataKey="total_fat_g"     stroke={T.fat}   strokeWidth={1.5} dot={false} strokeDasharray="8 3 2 3" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {error && <div style={{ color: T.red, fontSize: 12.5 }}>{error}</div>}
       {days === null && !error && (
@@ -111,7 +187,7 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
 
       {/* Day rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {days !== null && allDays.map((day) => {
+        {days !== null && days.map((day) => {
           const isOpen = openDay === day.date;
           const pct    = target > 0 ? Math.min(1, day.total_calories / target) : 0;
           return (
@@ -138,7 +214,6 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
                     {day.total_calories > 0 ? `${Math.round(day.total_calories)} kcal` : '—'}
                   </span>
                 </div>
-                {/* Progress bar */}
                 <div style={{ height: 4, background: T.lineSoft, borderRadius: 2, width: '100%', overflow: 'hidden' }}>
                   <div style={{
                     width: `${pct * 100}%`, height: '100%',
@@ -154,19 +229,58 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
                     <div style={{ fontSize: 12, color: T.inkFaint }}>— no meals logged</div>
                   )}
                   {day.meals.map((m) => (
-                    <button key={m.id} onClick={() => onEditMeal(m)} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      background: T.lineSoft, border: 'none', borderRadius: 10, padding: '9px 12px',
-                      cursor: 'pointer', fontFamily: T.font, textAlign: 'left', width: '100%',
+                    <div key={m.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      background: T.lineSoft, borderRadius: 10, padding: '8px 10px',
                     }}>
-                      <span style={{ fontSize: 13, color: T.ink, fontWeight: 500 }}>
-                        {m.name}
-                        <span style={{ color: T.inkFaint, fontWeight: 400 }}>
-                          {' '}· {new Date(m.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                        </span>
-                      </span>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: T.green }}>{Math.round(m.calories)} cal</span>
-                    </button>
+                      {/* Thumbnail */}
+                      {m.photo_url
+                        ? <img src={m.photo_url} alt="" style={{
+                            width: 44, height: 44, objectFit: 'cover', borderRadius: 10,
+                            flexShrink: 0,
+                          }} />
+                        : <div style={{
+                            width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                            background: T.lineSoft, border: `1px solid ${T.line}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {PWIcon2.plate(20, T.inkFaint)}
+                          </div>
+                      }
+                      {/* Info */}
+                      <button onClick={() => setViewingMeal(m)} style={{
+                        flex: 1, background: 'none', border: 'none', padding: 0,
+                        cursor: 'pointer', fontFamily: T.font,
+                        textAlign: 'left', minWidth: 0,
+                      }}>
+                        <div style={{ fontSize: 13, color: T.ink, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {m.name}
+                          <span style={{ color: T.inkFaint, fontWeight: 400 }}>
+                            {' '}· {new Date(m.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: T.green, marginTop: 1 }}>
+                          {Math.round(m.calories)} cal
+                        </div>
+                      </button>
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <button
+                          onClick={() => exportMealPdf(m)}
+                          title="Export PDF"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                        >
+                          {PWIcon2.share(15, T.green)}
+                        </button>
+                        <button
+                          onClick={() => setConfirmTarget(m)}
+                          title="Delete"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                        >
+                          {PWIcon2.trash(14)}
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -174,6 +288,26 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
           );
         })}
       </div>
+
+      {/* Meal detail view */}
+      <PWMealView
+        meal={viewingMeal}
+        onClose={() => setViewingMeal(null)}
+        onEdit={() => { const m = viewingMeal; setViewingMeal(null); onEditMeal && onEditMeal(m); }}
+        onShare={async () => {
+          try { await exportMealPdf(viewingMeal); }
+          catch { setError('PDF export failed — please try again'); }
+        }}
+      />
+
+      {/* Delete confirmation */}
+      <PWConfirm
+        open={!!confirmTarget}
+        title="Delete this meal?"
+        message={confirmTarget ? `"${confirmTarget.name}" will be removed from your history. This can't be undone.` : ''}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmTarget(null)}
+      />
 
       {/* Bottom Nav */}
       <BottomNav

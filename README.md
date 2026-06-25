@@ -1,18 +1,29 @@
 # Platewise
 
-Food nutrition analyzer. Take a photo of food, get a nutrition infographic powered by Claude vision.
+Personal food nutrition analyser. Describe a meal and optionally upload a photo — Claude vision breaks it into ingredients and returns a nutrition card with calories, macros, and micros.
 
 ## Stack
 
-- **Frontend** — React + Vite + Tailwind (in `client/`)
-- **Backend** — Vercel serverless function at `api/analyze.js`; Express dev server at `server/server.js` mirrors it locally
-- **LLM** — `claude-sonnet-4-6` with vision
+- **Frontend** — React + Vite, inline styles, `@fontsource/fraunces` + `@fontsource/inter` typography
+- **Backend** — Vercel serverless functions under `api/`; Express dev server at `server/server.js` mirrors them locally
+- **Database** — Vercel Postgres (`meal_logs`, `saved_meals`, `saved_ingredients`, `user_settings` tables)
+- **Storage** — Vercel Blob (meal photos)
+- **LLM** — `claude-haiku-4-5-20251001` with forced tool use for structured nutrition output
+
+## Features
+
+- **Scan** — type a food name, attach a photo, get a full nutrition card (calories, macros, fiber, sodium, health score)
+- **Dashboard** — daily calorie ring, macro progress pills, per-meal-type breakdown, quick-add from saved meals
+- **History** — week navigator (backward unlimited; forward blocked at the current week); current week shows only days up to and including today
+- **Library** — flat list of saved meals; searchable
+- **Auth** — single shared passcode, stateless signed cookie (HMAC-SHA256)
+- **PNG export** — download the nutrition card as an image
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# edit .env, set ANTHROPIC_API_KEY
+# Set ANTHROPIC_API_KEY, SESSION_SECRET, POSTGRES_URL, BLOB_READ_WRITE_TOKEN
 
 npm run install:all
 ```
@@ -23,40 +34,86 @@ npm run install:all
 npm run dev
 ```
 
-Runs the Express API on `http://localhost:3001` and the Vite client (when present) concurrently. The client should proxy `/api` to `localhost:3001` (configure in `client/vite.config.js`).
+Starts the Express API on `http://localhost:3001` and the Vite dev server concurrently. Vite proxies `/api/*` to `localhost:3001`.
 
-## API
+## API endpoints
 
-`POST /api/analyze`
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/analyze` | Analyse a meal (requires auth) |
+| GET/POST | `/api/auth` | Check session / verify passcode |
+| GET/POST/PATCH | `/api/meals` | Today's logged meals |
+| GET | `/api/meals-history` | Week range of logged meals |
+| GET/POST/PATCH/DELETE | `/api/saved-meals` | Saved meal library |
+| GET/POST/DELETE | `/api/saved-ingredients` | Saved ingredients (backend only, not surfaced in UI) |
+| GET/PATCH | `/api/settings` | Daily nutrition targets |
+| POST | `/api/log-again` | Re-log a past meal (reuses existing photo URL) |
 
-Request:
+### `/api/analyze` request
+
 ```json
 {
   "name": "Butter Chicken",
-  "imageBase64": "<base64-encoded image, no data: prefix>",
+  "imageBase64": "<base64 string>",
   "mimeType": "image/jpeg"
 }
 ```
 
-Response: JSON object matching the schema enforced in [`api/analyze.js`](api/analyze.js) — name, serving, calories, macros, other, fact, tips, healthScore, mismatch.
+### `/api/analyze` response
 
-## Deploy (Vercel)
-
-1. Push this repo to GitHub.
-2. Import the repo in Vercel.
-3. Set `ANTHROPIC_API_KEY` in Vercel project env vars.
-4. Vercel auto-detects `api/` as serverless functions and builds the client to `client/dist` per `vercel.json`.
+```json
+{
+  "name": "string",
+  "serving": "string",
+  "calories": 450,
+  "macros": { "carbs": 30, "protein": 28, "fat": 18 },
+  "other": { "fiber": 3, "sugar": 6, "sodium": 820 },
+  "fact": "string",
+  "tips": ["string", "string", "string"],
+  "healthScore": 7,
+  "mismatch": false
+}
+```
 
 ## Project layout
 
 ```
 platewise/
-├── api/
-│   └── analyze.js          # Vercel serverless function (production endpoint)
+├── api/                        # Vercel serverless functions (production)
+│   ├── analyze.js              # Claude vision call — the only Anthropic API call
+│   ├── auth.js
+│   ├── meals.js
+│   ├── meals-history.js
+│   ├── saved-meals.js
+│   ├── saved-ingredients.js
+│   ├── settings.js
+│   └── log-again.js
 ├── server/
-│   └── server.js           # Express wrapper that calls the same handler in dev
-├── client/                 # Vite + React frontend (added separately)
-├── package.json
+│   ├── server.js               # Express wrapper for local dev
+│   └── loadenv.js
+├── client/
+│   ├── src/
+│   │   ├── main.jsx            # Entry point — font CSS imports live here
+│   │   ├── App.jsx             # Router / view switcher
+│   │   ├── tokens.jsx          # Design tokens, shared utilities, shared components
+│   │   ├── index.css           # Animations and keyframes
+│   │   └── components/
+│   │       ├── PWDashboard.jsx
+│   │       ├── PWHistory.jsx
+│   │       ├── PWLibrary.jsx
+│   │       ├── PWAddMeal.jsx
+│   │       ├── PWReview.jsx
+│   │       ├── PWEditMeal.jsx
+│   │       └── PWLock.jsx
+│   ├── index.html
+│   └── vite.config.js
+├── package.json                # Root scripts (dev, build, install:all)
 ├── vercel.json
 └── .env.example
 ```
+
+## Deploy (Vercel)
+
+1. Push this repo to GitHub.
+2. Import in Vercel; set env vars: `ANTHROPIC_API_KEY`, `SESSION_SECRET`, `POSTGRES_URL`, `BLOB_READ_WRITE_TOKEN`.
+3. Vercel auto-detects `api/` as serverless functions and builds `client/` to `client/dist` per `vercel.json`.

@@ -6,6 +6,15 @@
   "functions": {
     "api/analyze.js": {
       "maxDuration": 30
+    },
+    "api/public/[...slug].js": {
+      "maxDuration": 10
+    },
+    "api/me/[...slug].js": {
+      "maxDuration": 10
+    },
+    "api/admin/[...slug].js": {
+      "maxDuration": 10
     }
   },
   "rewrites": [

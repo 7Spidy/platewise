@@ -1,5 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { sql } from '@vercel/postgres';
 import { requireAuth } from '../lib/auth.js';
+import { validateNutritionPayload } from '../lib/schema.js';
+import { windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable } from '../lib/scanLimit.js';
+import { calcCost } from '../lib/cost.js';
 
 const client = new Anthropic();
 
@@ -77,16 +81,17 @@ const NUTRITION_TOOL = {
 
 const VALID_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
-function validateResult(d) {
-  const errs = [];
-  if (typeof d.calories !== 'number' || d.calories < 0) errs.push('calories');
-  if (!d.macros || ['carbs', 'protein', 'fat'].some(k => typeof d.macros[k] !== 'number')) errs.push('macros');
-  if (!d.other  || ['fiber', 'sugar', 'sodium'].some(k => typeof d.other[k]  !== 'number')) errs.push('other');
-  if (!Array.isArray(d.tips) || d.tips.length !== 3) errs.push('tips');
-  if (typeof d.healthScore !== 'number' || d.healthScore < 1 || d.healthScore > 10) errs.push('healthScore');
-  if (typeof d.mismatch !== 'boolean') errs.push('mismatch');
-  if (!Array.isArray(d.ingredients) || d.ingredients.length === 0) errs.push('ingredients');
-  return errs;
+async function callWithRetry(params) {
+  const delays = [500, 1500];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await client.messages.create(params);
+    } catch (err) {
+      const shouldRetry = (err?.status === 429 || err?.status === 529) && attempt < delays.length;
+      if (!shouldRetry) throw err;
+      await new Promise((r) => setTimeout(r, delays[attempt]));
+    }
+  }
 }
 
 export default async function handler(req, res) {
@@ -97,7 +102,33 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Scan limit check
+  try {
+    const { rows: userRows } = await sql`select bonus_scans from users where id = ${req.user.id}`;
+    const user = userRows[0] ?? { bonus_scans: 0 };
+    const ws = windowStart();
+    const { rows: usageRows } = await sql`
+      select count(*) as count, min(created_at) as oldest
+      from api_usage where user_id = ${req.user.id} and created_at >= ${ws.toISOString()}
+    `;
+    const usageCount = Number(usageRows[0]?.count ?? 0);
+    if (isBlocked(user, usageCount)) {
+      const nextAvailableAt = calcNextAvailable(usageRows[0]?.oldest);
+      return res.status(429).json({ error: 'scan_limit_reached', nextAvailableAt });
+    }
+  } catch (err) {
+    console.error('Scan limit check failed:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+
   let { name, details, imageBase64, mimeType } = req.body || {};
+
+  if (imageBase64) {
+    const byteLen = Buffer.byteLength(imageBase64, 'base64');
+    if (byteLen > 2 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Image too large, please retake or recompress' });
+    }
+  }
 
   const isTextMode = !imageBase64;
   const context = [name, details]
@@ -123,18 +154,13 @@ export default async function handler(req, res) {
       ];
 
   try {
-    const response = await client.messages.create({
+    const response = await callWithRetry({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1536,
-      system: SYSTEM_PROMPT,
-      tools: [NUTRITION_TOOL],
+      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      tools: [{ ...NUTRITION_TOOL, cache_control: { type: 'ephemeral' } }],
       tool_choice: { type: 'tool', name: 'record_nutrition' },
-      messages: [
-        {
-          role: 'user',
-          content: userContent,
-        },
-      ],
+      messages: [{ role: 'user', content: userContent }],
     });
 
     const toolUse = response.content.find((b) => b.type === 'tool_use');
@@ -144,10 +170,24 @@ export default async function handler(req, res) {
     }
 
     const parsed = toolUse.input;
-    const errors = validateResult(parsed);
+    const errors = validateNutritionPayload(parsed);
     if (errors.length > 0) {
       console.error('Schema validation failed on fields:', errors, parsed);
       return res.status(502).json({ error: `Invalid model response: ${errors.join(', ')}` });
+    }
+
+    // Log usage
+    try {
+      const usage = response.usage;
+      const inputTokens = (usage?.input_tokens ?? 0) + (usage?.cache_read_input_tokens ?? 0);
+      const outputTokens = usage?.output_tokens ?? 0;
+      const { cost_usd, cost_inr } = calcCost(inputTokens, outputTokens);
+      await sql`
+        insert into api_usage (user_id, input_tokens, output_tokens, cost_usd, cost_inr)
+        values (${req.user.id}, ${inputTokens}, ${outputTokens}, ${cost_usd}, ${cost_inr})
+      `;
+    } catch (usageErr) {
+      console.error('Usage logging failed (non-fatal):', usageErr);
     }
 
     return res.status(200).json(parsed);

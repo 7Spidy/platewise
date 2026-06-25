@@ -1,7 +1,8 @@
 // api/meals.js
 import { sql } from '@vercel/postgres';
 import { requireAuth } from '../lib/auth.js';
-import { uploadMealPhoto } from '../lib/blob.js';
+import { uploadMealPhoto, deleteMealPhoto } from '../lib/blob.js';
+import { validateMealWritePayload } from '../lib/schema.js';
 
 export default async function handler(req, res) {
   if (!requireAuth(req, res)) return;
@@ -15,7 +16,8 @@ export default async function handler(req, res) {
                  fiber_g, sugar_g, sodium_mg, health_score, fact, tips, mismatch,
                  photo_url, meal_type, ingredients
           from meal_logs
-          where created_at::date = ${date}::date
+          where user_id = ${req.user.id}
+            and (created_at + interval '5 hours 30 minutes')::date = ${date}::date
           order by created_at asc
         `;
         return res.status(200).json(rows);
@@ -26,13 +28,14 @@ export default async function handler(req, res) {
                fiber_g, sugar_g, sodium_mg, health_score, fact, tips, mismatch,
                photo_url, meal_type, ingredients
         from meal_logs
+        where user_id = ${req.user.id}
         order by created_at desc
         limit 200
       `;
       return res.status(200).json(rows);
     } catch (err) {
       console.error('GET /api/meals failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
@@ -44,11 +47,11 @@ export default async function handler(req, res) {
       imageBase64, mimeType, loggedAt,
     } = req.body || {};
 
-    if (!name || typeof calories !== 'number') {
-      return res.status(400).json({ error: 'name and calories are required' });
+    const payloadErrors = validateMealWritePayload({ name, calories, ingredients });
+    if (payloadErrors.length > 0) {
+      return res.status(400).json({ error: payloadErrors.join('; ') });
     }
 
-    // Round all floats to integers — meal_logs columns are integer typed
     const ri = (v) => (v != null ? Math.round(v) : null);
 
     let photoUrl = null;
@@ -63,10 +66,10 @@ export default async function handler(req, res) {
     try {
       const { rows } = await sql`
         insert into meal_logs
-          (name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
+          (user_id, name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
            health_score, fact, tips, mismatch, photo_url, meal_type, ingredients, created_at)
         values
-          (${name}, ${serving ?? null}, ${ri(calories)},
+          (${req.user.id}, ${name}, ${serving ?? null}, ${ri(calories)},
            ${ri(macros.carbs)}, ${ri(macros.protein)}, ${ri(macros.fat)},
            ${ri(other.fiber)}, ${ri(other.sugar)}, ${ri(other.sodium)},
            ${ri(healthScore)}, ${fact ?? null}, ${JSON.stringify(tips ?? [])},
@@ -78,7 +81,7 @@ export default async function handler(req, res) {
       return res.status(201).json(rows[0]);
     } catch (err) {
       console.error('POST /api/meals failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
@@ -90,11 +93,13 @@ export default async function handler(req, res) {
     } = req.body || {};
 
     if (!id) return res.status(400).json({ error: 'id is required' });
-    if (!name || typeof calories !== 'number') {
-      return res.status(400).json({ error: 'name and calories are required' });
-    }
     if (!loggedAt) {
       return res.status(400).json({ error: 'loggedAt is required (send the existing value if unchanged)' });
+    }
+
+    const payloadErrors = validateMealWritePayload({ name, calories, ingredients });
+    if (payloadErrors.length > 0) {
+      return res.status(400).json({ error: payloadErrors.join('; ') });
     }
 
     const ri = (v) => (v != null ? Math.round(v) : null);
@@ -118,14 +123,14 @@ export default async function handler(req, res) {
           meal_type    = ${mealType ?? null},
           ingredients  = ${ingredients ? JSON.stringify(ingredients) : null},
           created_at   = ${new Date(loggedAt).toISOString()}
-        where id = ${id}
+        where id = ${id} and user_id = ${req.user.id}
         returning *
       `;
       if (rows.length === 0) return res.status(404).json({ error: 'Meal not found' });
       return res.status(200).json(rows[0]);
     } catch (err) {
       console.error('PATCH /api/meals failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 
@@ -133,11 +138,24 @@ export default async function handler(req, res) {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id is required' });
     try {
-      await sql`delete from meal_logs where id = ${id}`;
+      // Get the photo_url before deleting — only for this user's meal
+      const { rows: photoRows } = await sql`select photo_url from meal_logs where id = ${id} and user_id = ${req.user.id}`;
+      const photoUrl = photoRows[0]?.photo_url;
+
+      await sql`delete from meal_logs where id = ${id} and user_id = ${req.user.id}`;
+
+      // Delete blob only if not referenced by a saved meal
+      if (photoUrl) {
+        const { rows: saved } = await sql`select 1 from saved_meals where photo_url = ${photoUrl} limit 1`;
+        if (saved.length === 0) {
+          await deleteMealPhoto(photoUrl);
+        }
+      }
+
       return res.status(204).end();
     } catch (err) {
       console.error('DELETE /api/meals failed:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ error: 'Something went wrong, please try again' });
     }
   }
 

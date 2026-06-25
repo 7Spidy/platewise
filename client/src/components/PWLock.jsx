@@ -13,7 +13,7 @@ export default function PWLock({ onUnlock }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth', {
+      const res = await fetch('/api/public/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ passcode }),
