@@ -72,7 +72,7 @@ function PWHowItWorks({ onClose }) {
 }
 
 // ── RequireAuth wrapper ──────────────────────────────────────────────────────
-function RequireAuth({ children, requireAdmin = false }) {
+function RequireAuth({ children, requireAdmin = false, allowIncompleteOnboarding = false }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState('checking'); // checking | ok | unauthed | notAdmin | needsOnboarding
 
@@ -82,14 +82,14 @@ function RequireAuth({ children, requireAdmin = false }) {
       .then((user) => {
         if (requireAdmin && user.role !== 'admin') {
           setStatus('notAdmin');
-        } else if (!user.onboarding_completed_at && user.role !== 'admin') {
+        } else if (!allowIncompleteOnboarding && !user.onboarding_completed_at && user.role !== 'admin') {
           setStatus('needsOnboarding');
         } else {
           setStatus('ok');
         }
       })
       .catch(() => setStatus('unauthed'));
-  }, [requireAdmin]);
+  }, [requireAdmin, allowIncompleteOnboarding]);
 
   if (status === 'checking') return <div style={{ minHeight: '100vh', background: T.bg }} />;
   if (status === 'unauthed') return <Navigate to="/login" replace />;
@@ -229,7 +229,7 @@ export default function App() {
 
       {/* Onboarding — auth'd but before onboarding_completed_at */}
       <Route path="/onboarding" element={
-        <RequireAuth>
+        <RequireAuth allowIncompleteOnboarding>
           <PWOnboarding onComplete={() => window.location.replace('/app')} />
         </RequireAuth>
       } />
