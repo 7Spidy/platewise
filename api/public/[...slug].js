@@ -9,7 +9,7 @@ import crypto from 'crypto';
 export default async function handler(req, res) {
   const rawSlug = req.query.slug ?? req.query['...slug'];
   const slug = Array.isArray(rawSlug) ? rawSlug : (rawSlug ? [rawSlug] : []);
-  const [route, token] = slug;
+  const [route] = slug;
 
   // POST /api/public/login
   if (route === 'login' && req.method === 'POST') {
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
           insert into password_reset_tokens (user_id, token_hash, expires_at)
           values (${rows[0].id}, ${hash}, ${expires.toISOString()})
         `;
-        const url = `${process.env.APP_BASE_URL}/reset-password/${raw}`;
+        const url = `${process.env.APP_BASE_URL}/reset-password?token=${raw}`;
         await sendResetEmail(email.toLowerCase().trim(), url).catch((err) => {
           console.error('sendResetEmail failed:', err);
         });
@@ -104,8 +104,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // GET /api/public/reset-password/:token — validate token
+  // GET /api/public/reset-password — validate token
   if (route === 'reset-password' && req.method === 'GET') {
+    const token = req.query.token;
     if (!token) return res.status(400).json({ error: 'token is required' });
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     try {
@@ -122,10 +123,10 @@ export default async function handler(req, res) {
     }
   }
 
-  // POST /api/public/reset-password/:token — set new password
+  // POST /api/public/reset-password — set new password
   if (route === 'reset-password' && req.method === 'POST') {
+    const { token, password } = req.body || {};
     if (!token) return res.status(400).json({ error: 'token is required' });
-    const { password } = req.body || {};
     if (!password || password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
@@ -152,8 +153,9 @@ export default async function handler(req, res) {
     }
   }
 
-  // GET /api/public/invite/:token — validate invite, return email
+  // GET /api/public/invite — validate invite, return email
   if (route === 'invite' && req.method === 'GET') {
+    const token = req.query.token;
     if (!token) return res.status(400).json({ error: 'token is required' });
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     try {
@@ -170,10 +172,10 @@ export default async function handler(req, res) {
     }
   }
 
-  // POST /api/public/invite/:token — accept invite, create user
+  // POST /api/public/invite — accept invite, create user
   if (route === 'invite' && req.method === 'POST') {
+    const { token, password, name } = req.body || {};
     if (!token) return res.status(400).json({ error: 'token is required' });
-    const { password, name } = req.body || {};
     if (!password || password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }

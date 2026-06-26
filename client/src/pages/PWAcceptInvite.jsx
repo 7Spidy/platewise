@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { T } from '../tokens.jsx';
 
 export default function PWAcceptInvite() {
-  const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
   const navigate = useNavigate();
   const [inviteEmail, setInviteEmail] = useState('');
   const [valid, setValid] = useState(null); // null=checking, true, false
@@ -14,7 +15,8 @@ export default function PWAcceptInvite() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`/api/public/invite/${encodeURIComponent(token)}`)
+    if (!token) { setValid(false); return; }
+    fetch(`/api/public/invite?token=${encodeURIComponent(token)}`)
       .then(async (r) => {
         if (!r.ok) { setValid(false); return; }
         const data = await r.json();
@@ -37,10 +39,10 @@ export default function PWAcceptInvite() {
     }
     setLoading(true);
     try {
-      const r = await fetch(`/api/public/invite/${encodeURIComponent(token)}`, {
+      const r = await fetch('/api/public/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, name: name.trim() || undefined }),
+        body: JSON.stringify({ token, password, name: name.trim() || undefined }),
       });
       const data = await r.json();
       if (!r.ok) {

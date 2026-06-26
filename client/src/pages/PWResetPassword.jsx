@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { T } from '../tokens.jsx';
 
 export default function PWResetPassword() {
-  const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
   const navigate = useNavigate();
   const [valid, setValid] = useState(null); // null=checking, true, false
   const [password, setPassword] = useState('');
@@ -12,7 +13,8 @@ export default function PWResetPassword() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`/api/public/reset-password/${encodeURIComponent(token)}`)
+    if (!token) { setValid(false); return; }
+    fetch(`/api/public/reset-password?token=${encodeURIComponent(token)}`)
       .then((r) => {
         setValid(r.ok);
       })
@@ -32,10 +34,10 @@ export default function PWResetPassword() {
     }
     setLoading(true);
     try {
-      const r = await fetch(`/api/public/reset-password/${encodeURIComponent(token)}`, {
+      const r = await fetch('/api/public/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ token, password }),
       });
       const data = await r.json();
       if (!r.ok) {

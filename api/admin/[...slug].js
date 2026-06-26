@@ -104,7 +104,7 @@ export default async function handler(req, res) {
         const { raw, hash } = generateToken();
         const expires = new Date(Date.now() + 48 * 60 * 60 * 1000);
         await sql`insert into invite_tokens (email, token_hash, expires_at) values (${rows[0].email}, ${hash}, ${expires.toISOString()})`;
-        const url = `${process.env.APP_BASE_URL}/invite/${raw}`;
+        const url = `${process.env.APP_BASE_URL}/invite?token=${raw}`;
         const emailResult = await sendInviteEmail(rows[0].email, url).catch((err) => {
           console.error('sendInviteEmail failed:', err);
           return { error: true, message: err?.message || 'Email send failed' };
@@ -131,7 +131,7 @@ export default async function handler(req, res) {
       const { raw, hash } = generateToken();
       const expires = new Date(Date.now() + 48 * 60 * 60 * 1000);
       await sql`insert into invite_tokens (email, token_hash, expires_at) values (${normalized}, ${hash}, ${expires.toISOString()})`;
-      const url = `${process.env.APP_BASE_URL}/invite/${raw}`;
+      const url = `${process.env.APP_BASE_URL}/invite?token=${raw}`;
       const emailResult = await sendInviteEmail(normalized, url).catch((err) => {
         console.error('sendInviteEmail failed:', err);
         return { error: true, message: err?.message || 'Email send failed' };

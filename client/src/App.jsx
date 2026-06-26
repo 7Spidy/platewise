@@ -224,8 +224,8 @@ export default function App() {
       <Route path="/"                      element={<PWLanding />} />
       <Route path="/login"                 element={<PWLogin />} />
       <Route path="/forgot-password"       element={<PWForgotPassword />} />
-      <Route path="/reset-password/:token" element={<PWResetPassword />} />
-      <Route path="/invite/:token"         element={<PWAcceptInvite />} />
+      <Route path="/reset-password" element={<PWResetPassword />} />
+      <Route path="/invite"         element={<PWAcceptInvite />} />
 
       {/* Onboarding — auth'd but before onboarding_completed_at */}
       <Route path="/onboarding" element={
