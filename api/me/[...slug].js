@@ -2,6 +2,16 @@ import { sql } from '@vercel/postgres';
 import {
   requireAuth, clearSessionCookie,
 } from '../../lib/auth.js';
+
+function toTargetsShape(row) {
+  return {
+    target_calories: row.calorie_target,
+    target_protein_g: row.macro_protein_g,
+    target_carbs_g: row.macro_carbs_g,
+    target_fat_g: row.macro_fat_g,
+    manually_edited: row.manually_edited,
+  };
+}
 import { calcTarget, inchesToCm, lbsToKg } from '../../lib/calorie.js';
 import { windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable } from '../../lib/scanLimit.js';
 import { validateTargets } from '../../lib/settings.js';
@@ -138,16 +148,15 @@ export default async function handler(req, res) {
     try {
       const { rows } = await sql`select * from user_settings where user_id = ${req.user.id}`;
       if (rows.length === 0) {
-        return res.status(200).json({
-          user_id: req.user.id,
+        return res.status(200).json(toTargetsShape({
           calorie_target: 2200,
           macro_protein_g: 180,
           macro_carbs_g: 200,
           macro_fat_g: 70,
           manually_edited: false,
-        });
+        }));
       }
-      return res.status(200).json(rows[0]);
+      return res.status(200).json(toTargetsShape(rows[0]));
     } catch (err) {
       console.error('GET /api/me/settings failed:', err);
       return res.status(500).json({ error: err.message });
@@ -173,7 +182,7 @@ export default async function handler(req, res) {
           updated_at      = now()
         returning *
       `;
-      return res.status(200).json(rows[0]);
+      return res.status(200).json(toTargetsShape(rows[0]));
     } catch (err) {
       console.error('PATCH /api/me/settings failed:', err);
       return res.status(500).json({ error: err.message });

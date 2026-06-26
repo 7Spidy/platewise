@@ -2,7 +2,12 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { T, PWRing, PWIcon2, BottomNav, getGreeting, isoDate } from '../tokens.jsx';
 import PWMealView from './PWMealView.jsx';
+import PWFeedbackSheet from './PWFeedbackSheet.jsx';
+import { ACTIVITY_OPTIONS, GOAL_OPTIONS } from './PWOnboarding.jsx';
 import { exportMealPdf } from '../lib/exportPdf.js';
+
+const cmToInches = (cm) => Math.round((cm / 2.54) * 10) / 10;
+const kgToLbs = (kg) => Math.round((kg * 2.20462) * 10) / 10;
 
 const MEAL_TYPES  = ['breakfast', 'lunch', 'snack', 'dinner'];
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
@@ -34,6 +39,12 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
   const [settings, setSettings]         = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [draftTargets, setDraftTargets] = useState(null);
+  const [showGearMenu, setShowGearMenu] = useState(false);
+  const [showProfile, setShowProfile]   = useState(false);
+  const [profileForm, setProfileForm]   = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [showFeedback, setShowFeedback] = useState(false);
   const [busyChip, setBusyChip]         = useState(null);
   const [error, setError]               = useState(null);
   const [viewingMeal, setViewingMeal]   = useState(null);
@@ -141,6 +152,73 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     }
   };
 
+  async function openProfileEditor() {
+    setProfileError('');
+    setProfileLoading(true);
+    setShowProfile(true);
+    try {
+      const r = await fetch('/api/me/profile');
+      const data = await r.json();
+      const unit_pref = data.unit_pref || 'metric';
+      const height = data.height_cm != null
+        ? (unit_pref === 'imperial' ? cmToInches(data.height_cm) : data.height_cm)
+        : '';
+      const weight = data.weight_kg != null
+        ? (unit_pref === 'imperial' ? kgToLbs(data.weight_kg) : data.weight_kg)
+        : '';
+      setProfileForm({
+        name: data.name || '',
+        gender: data.gender || '',
+        age: data.age ?? '',
+        height,
+        weight,
+        unit_pref,
+        activity_level: data.activity_level || '',
+        goal: data.goal || 'maintain',
+      });
+    } catch {
+      setProfileError('Could not load profile');
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function saveProfile() {
+    setProfileError('');
+    if (!profileForm.gender || !profileForm.age || !profileForm.height || !profileForm.weight || !profileForm.activity_level) {
+      setProfileError('Please fill in all required fields');
+      return;
+    }
+    setProfileLoading(true);
+    try {
+      const r = await fetch('/api/me/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profileForm.name || undefined,
+          gender: profileForm.gender,
+          age: profileForm.age,
+          height: profileForm.height,
+          weight: profileForm.weight,
+          unit_pref: profileForm.unit_pref,
+          activity_level: profileForm.activity_level,
+          goal: profileForm.goal,
+        }),
+      });
+      if (!r.ok) {
+        const b = await r.json().catch(() => ({}));
+        setProfileError(b.error || 'Could not save profile');
+        return;
+      }
+      setShowProfile(false);
+      await load();
+    } catch {
+      setProfileError('Could not save profile');
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
   const targets = settings || { target_calories: 2200, target_protein_g: 180, target_carbs_g: 200, target_fat_g: 70 };
   const remaining = Math.max(0, targets.target_calories - Math.round(totals.calories));
 
@@ -161,15 +239,47 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
             {getGreeting()}
           </div>
         </div>
-        <button
-          onClick={() => { setDraftTargets({ ...targets }); setShowSettings(true); }}
-          style={{
-            width: 36, height: 36, borderRadius: 10, background: '#fff',
-            border: `1px solid ${T.line}`, display: 'grid', placeItems: 'center',
-            cursor: 'pointer', boxShadow: T.shadowSoft,
-          }}>
-          {PWIcon2.gear(16)}
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowGearMenu((v) => !v)}
+            style={{
+              width: 36, height: 36, borderRadius: 10, background: '#fff',
+              border: `1px solid ${T.line}`, display: 'grid', placeItems: 'center',
+              cursor: 'pointer', boxShadow: T.shadowSoft,
+            }}>
+            {PWIcon2.gear(16)}
+          </button>
+          {showGearMenu && (
+            <>
+              <div onClick={() => setShowGearMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />
+              <div style={{
+                position: 'absolute', top: 42, right: 0, zIndex: 40,
+                background: '#fff', borderRadius: 12, boxShadow: T.shadow,
+                border: `1px solid ${T.line}`, minWidth: 160, overflow: 'hidden',
+              }}>
+                <button
+                  onClick={() => { setShowGearMenu(false); setDraftTargets({ ...targets }); setShowSettings(true); }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left', padding: '11px 14px',
+                    border: 'none', background: 'none', cursor: 'pointer',
+                    fontFamily: T.font, fontSize: 13.5, color: T.ink,
+                  }}>
+                  Daily Targets
+                </button>
+                <button
+                  onClick={() => { setShowGearMenu(false); openProfileEditor(); }}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left', padding: '11px 14px',
+                    border: `1px solid ${T.line}`, borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
+                    background: 'none', cursor: 'pointer',
+                    fontFamily: T.font, fontSize: 13.5, color: T.ink,
+                  }}>
+                  Edit Profile
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Date Stepper ── */}
@@ -367,6 +477,17 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         }}
       />
 
+      {/* ── Send feedback ── */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        style={{
+          display: 'block', margin: '24px auto 0', padding: '10px 16px',
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontFamily: T.font, fontSize: 13, color: T.inkMute, textDecoration: 'underline',
+        }}>
+        Send feedback
+      </button>
+
       {/* ── Bottom Nav ── */}
       <BottomNav
         active="home"
@@ -375,6 +496,151 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         onHistory={onHistory}
         onLibrary={onLibrary}
       />
+
+      {/* ── Edit Profile Modal ── */}
+      {showProfile && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(39,26,15,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 50, padding: 20, overflowY: 'auto',
+        }} onClick={() => setShowProfile(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: '#fff', borderRadius: 20, padding: 24,
+            width: '100%', maxWidth: 360, boxShadow: T.shadow,
+            display: 'flex', flexDirection: 'column', gap: 14,
+            margin: 'auto',
+          }}>
+            <div style={{ fontFamily: T.heading, fontSize: 18, fontWeight: 700, color: T.ink }}>Edit Profile</div>
+
+            {profileLoading && !profileForm ? (
+              <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, padding: '20px 0' }}>Loading…</div>
+            ) : profileForm && (
+              <>
+                {/* Name */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={profileLabelStyle}>Name <span style={{ fontWeight: 400, color: T.inkFaint }}>(optional)</span></label>
+                  <input
+                    type="text"
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
+                    style={profileInputStyle(T)}
+                  />
+                </div>
+
+                {/* Gender */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={profileLabelStyle}>Gender</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {['male', 'female', 'other'].map((g) => (
+                      <button key={g} onClick={() => setProfileForm((f) => ({ ...f, gender: g }))} style={{
+                        flex: 1, padding: '9px 0', borderRadius: 10, cursor: 'pointer', fontFamily: T.font,
+                        fontSize: 13, fontWeight: profileForm.gender === g ? 600 : 400,
+                        background: profileForm.gender === g ? T.greenSoft : T.bg,
+                        border: `1.5px solid ${profileForm.gender === g ? T.green : T.line}`,
+                        color: profileForm.gender === g ? T.green : T.ink,
+                      }}>
+                        {g.charAt(0).toUpperCase() + g.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Age */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={profileLabelStyle}>Age</label>
+                  <input
+                    type="number"
+                    min="10" max="120"
+                    value={profileForm.age}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, age: e.target.value }))}
+                    style={profileInputStyle(T)}
+                  />
+                </div>
+
+                {/* Height */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={profileLabelStyle}>Height ({profileForm.unit_pref === 'imperial' ? 'in' : 'cm'})</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={profileForm.height}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, height: e.target.value }))}
+                    style={profileInputStyle(T)}
+                  />
+                </div>
+
+                {/* Weight */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={profileLabelStyle}>Weight ({profileForm.unit_pref === 'imperial' ? 'lbs' : 'kg'})</label>
+                  <input
+                    type="number"
+                    min="0" step="0.1"
+                    value={profileForm.weight}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, weight: e.target.value }))}
+                    style={profileInputStyle(T)}
+                  />
+                </div>
+
+                {/* Activity level */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={profileLabelStyle}>Activity level</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {ACTIVITY_OPTIONS.map((o) => (
+                      <button key={o.value} onClick={() => setProfileForm((f) => ({ ...f, activity_level: o.value }))} style={{
+                        background: profileForm.activity_level === o.value ? T.greenSoft : T.bg,
+                        border: `1.5px solid ${profileForm.activity_level === o.value ? T.green : T.line}`,
+                        borderRadius: 10, padding: '10px 12px',
+                        cursor: 'pointer', textAlign: 'left', fontFamily: T.font,
+                      }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: profileForm.activity_level === o.value ? T.green : T.ink }}>{o.label}</div>
+                        <div style={{ fontSize: 12, color: T.inkMute, marginTop: 2 }}>{o.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Goal */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={profileLabelStyle}>Goal</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {GOAL_OPTIONS.map((o) => (
+                      <button key={o.value} onClick={() => setProfileForm((f) => ({ ...f, goal: o.value }))} style={{
+                        background: profileForm.goal === o.value ? T.greenSoft : T.bg,
+                        border: `1.5px solid ${profileForm.goal === o.value ? T.green : T.line}`,
+                        borderRadius: 10, padding: '11px 14px',
+                        cursor: 'pointer', textAlign: 'left', fontFamily: T.font,
+                        display: 'flex', alignItems: 'center', gap: 10,
+                      }}>
+                        <span style={{ fontSize: 20 }}>{o.icon}</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 600, color: profileForm.goal === o.value ? T.green : T.ink }}>{o.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {profileError && (
+                  <div style={{ color: T.red, fontSize: 13, background: T.red50, border: `1px solid ${T.red}`, borderRadius: 8, padding: '9px 12px' }}>
+                    {profileError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                  <button onClick={() => setShowProfile(false)} style={{
+                    flex: 1, padding: '11px', borderRadius: 12, border: `1px solid ${T.line}`,
+                    background: '#fff', cursor: 'pointer', fontFamily: T.font, fontSize: 14, color: T.inkSoft,
+                  }}>Cancel</button>
+                  <button onClick={saveProfile} disabled={profileLoading} style={{
+                    flex: 1, padding: '11px', borderRadius: 12, border: 'none',
+                    background: T.green, color: '#fff', fontWeight: 700,
+                    cursor: profileLoading ? 'default' : 'pointer', fontFamily: T.font, fontSize: 14,
+                    opacity: profileLoading ? 0.7 : 1,
+                  }}>Save</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Settings Popover ── */}
       {showSettings && draftTargets && (
@@ -424,6 +690,9 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
           </div>
         </div>
       )}
+      {showFeedback && (
+        <PWFeedbackSheet onClose={() => setShowFeedback(false)} />
+      )}
     </div>
   );
 }
@@ -432,3 +701,16 @@ const sectionLabelStyle = {
   fontSize: 10.5, fontWeight: 700, color: T.inkMute,
   letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10,
 };
+
+const profileLabelStyle = {
+  fontSize: 11, color: T.inkMute, fontWeight: 600,
+  textTransform: 'uppercase', letterSpacing: '0.06em',
+};
+
+function profileInputStyle(T) {
+  return {
+    border: `1.5px solid ${T.line}`, borderRadius: 10,
+    padding: '10px 12px', fontSize: 15, fontFamily: T.font,
+    color: T.ink, outline: 'none',
+  };
+}

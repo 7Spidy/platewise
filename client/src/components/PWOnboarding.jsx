@@ -5,14 +5,14 @@ import { T } from '../tokens.jsx';
 const STEPS = ['name', 'gender', 'age', 'height', 'weight', 'activity', 'goal'];
 const STEP_LABELS = ['Your name', 'Gender', 'Age', 'Height', 'Weight', 'Activity level', 'Goal'];
 
-const ACTIVITY_OPTIONS = [
+export const ACTIVITY_OPTIONS = [
   { value: 'sedentary',  label: 'Sedentary',  desc: 'Little or no exercise' },
   { value: 'light',     label: 'Light',      desc: '1–3 days/week' },
   { value: 'moderate',  label: 'Moderate',   desc: '3–5 days/week' },
   { value: 'very',      label: 'Very active', desc: '6–7 days/week' },
 ];
 
-const GOAL_OPTIONS = [
+export const GOAL_OPTIONS = [
   { value: 'lose',     label: 'Lose weight',    icon: '📉' },
   { value: 'maintain', label: 'Maintain weight', icon: '⚖️' },
   { value: 'gain',     label: 'Gain weight',     icon: '📈' },
