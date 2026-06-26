@@ -4,7 +4,6 @@ import { T, PWRing, PWIcon2, BottomNav, getGreeting, isoDate } from '../tokens.j
 import PWMealView from './PWMealView.jsx';
 import PWFeedbackSheet from './PWFeedbackSheet.jsx';
 import { ACTIVITY_OPTIONS, GOAL_OPTIONS } from './PWOnboarding.jsx';
-import { exportMealPdf } from '../lib/exportPdf.js';
 
 const cmToInches = (cm) => Math.round((cm / 2.54) * 10) / 10;
 const kgToLbs = (kg) => Math.round((kg * 2.20462) * 10) / 10;
@@ -471,10 +470,6 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         meal={viewingMeal}
         onClose={() => setViewingMeal(null)}
         onEdit={() => { const m = viewingMeal; setViewingMeal(null); onEditMeal && onEditMeal(m); }}
-        onShare={async () => {
-          try { await exportMealPdf(viewingMeal); }
-          catch { setError('PDF export failed — please try again'); }
-        }}
       />
 
       {/* ── Send feedback ── */}

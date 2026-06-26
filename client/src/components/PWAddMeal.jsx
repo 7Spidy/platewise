@@ -1,6 +1,7 @@
 // client/src/components/PWAddMeal.jsx
 import React, { useRef, useState } from 'react';
 import { T, PWIcon2, compressImage } from '../tokens.jsx';
+import PWFactLoader from './PWFactLoader.jsx';
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Snack', 'Dinner'];
 
@@ -190,6 +191,8 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
       }}>
         {loading ? 'Analysing…' : 'Analyse →'}
       </button>
+
+      {loading && <PWFactLoader label="Analysing your meal…" />}
     </div>
   );
 }

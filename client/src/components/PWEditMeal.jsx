@@ -1,6 +1,7 @@
 // client/src/components/PWEditMeal.jsx
 import React, { useState } from 'react';
 import { T, PWIcon2 } from '../tokens.jsx';
+import PWFactLoader from './PWFactLoader.jsx';
 
 const MEAL_TYPES  = ['breakfast', 'lunch', 'snack', 'dinner'];
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
@@ -208,7 +209,9 @@ export default function PWEditMeal({ meal, onBack, onSaved }) {
             ))}
           </div>
           {recalculating && (
-            <div style={{ fontSize: 12, color: T.inkMute, textAlign: 'center', marginTop: 8 }}>Recalculating…</div>
+            <div style={{ marginTop: 8 }}>
+              <PWFactLoader label="Recalculating…" />
+            </div>
           )}
         </div>
       ) : (

@@ -6,7 +6,7 @@ function fmt(val, unit) {
   return val != null ? `${Math.round(val)}${unit}` : '—';
 }
 
-export default function PWMealView({ meal, onClose, onEdit, onShare }) {
+export default function PWMealView({ meal, onClose, onEdit }) {
   if (!meal) return null;
 
   const timeLabel = new Date(meal.created_at).toLocaleTimeString(undefined, {
@@ -138,15 +138,15 @@ export default function PWMealView({ meal, onClose, onEdit, onShare }) {
               Edit
             </button>
             <button
-              onClick={onShare}
+              onClick={onClose}
               style={{
                 flex: 1, padding: '12px', borderRadius: 12,
-                border: 'none', background: T.green, color: '#fff',
+                border: `1.5px solid ${T.line}`, background: '#fff',
                 cursor: 'pointer', fontFamily: T.font, fontSize: 14,
-                fontWeight: 700,
+                fontWeight: 600, color: T.inkSoft,
               }}
             >
-              Share PDF
+              Close
             </button>
           </div>
         </div>

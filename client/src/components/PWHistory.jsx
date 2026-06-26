@@ -4,7 +4,6 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { T, PWIcon2, BottomNav, isoDate } from '../tokens.jsx';
 import PWConfirm from './PWConfirm.jsx';
 import PWMealView from './PWMealView.jsx';
-import { exportMealPdf } from '../lib/exportPdf.js';
 
 function fmtDayLabel(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, {
@@ -266,13 +265,6 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
                       {/* Actions */}
                       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                         <button
-                          onClick={() => exportMealPdf(m)}
-                          title="Export PDF"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                        >
-                          {PWIcon2.share(15, T.green)}
-                        </button>
-                        <button
                           onClick={() => setConfirmTarget(m)}
                           title="Delete"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
@@ -294,10 +286,6 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
         meal={viewingMeal}
         onClose={() => setViewingMeal(null)}
         onEdit={() => { const m = viewingMeal; setViewingMeal(null); onEditMeal && onEditMeal(m); }}
-        onShare={async () => {
-          try { await exportMealPdf(viewingMeal); }
-          catch { setError('PDF export failed — please try again'); }
-        }}
       />
 
       {/* Delete confirmation */}
