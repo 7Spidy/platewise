@@ -16,7 +16,6 @@ function detectMealType() {
 export default function PWAddMeal({ onClose, onAnalyzed }) {
   const cameraInputRef  = useRef(null);
   const libraryInputRef = useRef(null);
-  const [tab, setTab]             = useState('photo');
   const [title, setTitle]         = useState('');
   const [details, setDetails]     = useState('');
   const [photo, setPhoto]         = useState(null);
@@ -27,7 +26,7 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
   const [error, setError]         = useState(null);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
 
-  const ready = tab === 'photo' ? !!imageBase64 : !!(title.trim() || details.trim());
+  const ready = !!title.trim();
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
@@ -51,9 +50,11 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
     setLoading(true);
     setError(null);
     try {
-      const body = tab === 'photo'
-        ? { name: title.trim(), details: details.trim(), imageBase64, mimeType }
-        : { name: title.trim(), details: details.trim() };
+      const body = {
+        name: title.trim(),
+        ...(details.trim() && { details: details.trim() }),
+        ...(imageBase64 && { imageBase64, mimeType }),
+      };
 
       const res = await fetch('/api/analyze', {
         method: 'POST',
@@ -93,21 +94,7 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', background: T.lineSoft, borderRadius: 12, padding: 4, gap: 4 }}>
-        {[['photo', '📷  Photo'], ['text', '✏️  Text']].map(([key, lbl]) => (
-          <button key={key} onClick={() => setTab(key)} style={{
-            flex: 1, padding: '9px', borderRadius: 9, border: 'none', cursor: 'pointer',
-            fontFamily: T.font, fontSize: 13, fontWeight: 600,
-            background: tab === key ? '#fff' : 'transparent',
-            color: tab === key ? T.green : T.inkMute,
-            boxShadow: tab === key ? T.shadowSoft : 'none',
-            transition: 'all 0.15s ease',
-          }}>{lbl}</button>
-        ))}
-      </div>
-
-      <Field label="Title" optional>
+      <Field label="Title">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -127,7 +114,8 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
       </Field>
 
       {/* Photo area */}
-      <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
+      <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" onChange={onFile}
+        style={{ position: 'absolute', opacity: 0, width: 1, height: 1, overflow: 'hidden', pointerEvents: 'none' }} />
       <input ref={libraryInputRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
 
       {showPhotoMenu && (
@@ -179,7 +167,7 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
         }}>
           {PWIcon2.camera(26, T.inkFaint)}
           <span style={{ fontSize: 12, color: T.inkFaint, fontWeight: 500 }}>
-            {tab === 'photo' ? 'Tap to add photo' : 'Add photo (optional, helps with portions)'}
+            Add photo (optional, helps with portions)
           </span>
         </button>
       )}

@@ -148,8 +148,8 @@ export default function PWReview({ data, draft, onBack, onSaved }) {
         </div>
         <button onClick={onExport} title="Export as image" style={{
           background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 18, color: T.inkMute, padding: 4,
-        }}>⭳</button>
+          padding: 4, display: 'grid', placeItems: 'center',
+        }}>{PWIcon2.download(18, T.inkMute)}</button>
       </div>
 
       {exportToast && (

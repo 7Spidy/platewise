@@ -39,9 +39,6 @@ export default function PWFactLoader({ label }) {
       textAlign: 'center', display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: 14,
     }}>
-      <style>{`
-        @keyframes pw-spin { to { transform: rotate(360deg); } }
-      `}</style>
       <div style={{
         width: 38, height: 38, borderRadius: '50%',
         border: `3px solid ${T.line}`,
@@ -56,7 +53,7 @@ export default function PWFactLoader({ label }) {
       </div>
       <div style={{
         fontSize: 13, color: T.inkSoft, lineHeight: 1.6,
-        fontStyle: 'italic', minHeight: 40,
+        fontStyle: 'italic',
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.2s ease',
       }}>

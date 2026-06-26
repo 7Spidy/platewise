@@ -10,6 +10,8 @@ body {
   overflow-x: auto;
 }
 
+@keyframes pw-spin { to { transform: rotate(360deg); } }
+
 @keyframes pwFadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }

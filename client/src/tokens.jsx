@@ -255,4 +255,9 @@ export const PWIcon2 = {
       <path d="M12 3v12M8 7l4-4 4 4" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
+  download: (size = 18, color = T.inkMute) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
 };
