@@ -232,5 +232,67 @@ export default async function handler(req, res) {
     }
   }
 
+  // GET /api/me/export
+  if (route === 'export' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const { rows: userRows } = await sql`select last_export_at from users where id = ${req.user.id}`;
+      const lastExportAt = userRows[0]?.last_export_at;
+      if (lastExportAt) {
+        const lastMs = new Date(lastExportAt).getTime();
+        const nowMs = Date.now();
+        const sixtyMinMs = 60 * 60 * 1000;
+        if (nowMs - lastMs < sixtyMinMs) {
+          const nextAvailableAt = new Date(lastMs + sixtyMinMs);
+          const minutesRemaining = Math.ceil((nextAvailableAt.getTime() - nowMs) / 60000);
+          return res.status(429).json({
+            error: 'rate_limited',
+            message: `You can export again in ${minutesRemaining} minute${minutesRemaining === 1 ? '' : 's'}.`,
+            nextAvailableAt: nextAvailableAt.toISOString(),
+          });
+        }
+      }
+      const now = new Date();
+      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const { rows: mealRows } = await sql`
+        select created_at, name, serving, meal_type, calories, carbs_g, protein_g, fat_g,
+               fiber_g, sugar_g, sodium_mg, health_score, ingredients
+        from meal_logs
+        where user_id = ${req.user.id} and created_at >= now() - interval '90 days'
+        order by created_at asc
+      `;
+      const meals = mealRows.map((r) => ({
+        logged_at: new Date(r.created_at).toISOString(),
+        name: r.name,
+        serving: r.serving,
+        meal_type: r.meal_type,
+        calories: r.calories,
+        protein_g: r.protein_g,
+        carbs_g: r.carbs_g,
+        fat_g: r.fat_g,
+        fiber_g: r.fiber_g,
+        sugar_g: r.sugar_g,
+        sodium_mg: r.sodium_mg,
+        health_score: r.health_score,
+        ingredients: r.ingredients,
+      }));
+      const payload = {
+        app: 'Platewise',
+        exported_at: now.toISOString(),
+        period: { from: ninetyDaysAgo.toISOString(), to: now.toISOString() },
+        meal_count: meals.length,
+        meals,
+      };
+      await sql`update users set last_export_at = now() where id = ${req.user.id}`;
+      const filename = `platewise-export-${now.toISOString().slice(0, 10)}.json`;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.status(200).send(JSON.stringify(payload, null, 2));
+    } catch (err) {
+      console.error('GET /api/me/export failed:', err);
+      return res.status(500).json({ error: 'Something went wrong' });
+    }
+  }
+
   return res.status(404).json({ error: 'Not found' });
 }
