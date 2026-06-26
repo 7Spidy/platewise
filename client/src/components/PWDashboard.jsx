@@ -470,6 +470,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         meal={viewingMeal}
         onClose={() => setViewingMeal(null)}
         onEdit={() => { const m = viewingMeal; setViewingMeal(null); onEditMeal && onEditMeal(m); }}
+        origin="dashboard"
       />
 
       {/* ── Send feedback ── */}

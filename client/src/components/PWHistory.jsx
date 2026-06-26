@@ -286,6 +286,8 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
         meal={viewingMeal}
         onClose={() => setViewingMeal(null)}
         onEdit={() => { const m = viewingMeal; setViewingMeal(null); onEditMeal && onEditMeal(m); }}
+        origin="history"
+        onLoggedAgain={() => { setViewingMeal(null); load(); }}
       />
 
       {/* Delete confirmation */}

@@ -108,6 +108,11 @@ Response (validated server-side — 502 if shape is wrong):
 - [ ] **Download PNG** — tap Download → file saved; action buttons not visible in the exported image
 - [ ] **Desktop layout** — viewport > 640px → sticky nav bar, centred 480px card, "How it works" modal opens and closes
 - [ ] **Mobile layout** — viewport < 640px → full-screen input screen → full-screen result screen on analyze
+- [ ] **Log again from History** — open a past meal from History, tap "Log again", confirm with default (now) timestamp, verify a new entry appears on today's Dashboard with the same food data and a new id.
+- [ ] **Log again with backdated time** — same as above but change the datetime field before confirming; verify the new entry's logged time matches what was entered, not the time the button was tapped.
+- [ ] **Log again hidden on Dashboard** — open a meal from the Dashboard's "today" list and confirm no "Log again" button appears in the detail view, only Edit/Close.
+- [ ] **Log again removed from Edit screen** — open Edit on any meal and confirm there is no "Log again" button in the header; only back button and title.
+- [ ] **Log again error handling** — simulate a failed `/api/log-again` call (e.g. temporarily break the endpoint or disconnect network) and confirm the modal stays open with an error message instead of silently failing or closing.
 
 ## Commit style
 ```

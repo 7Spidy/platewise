@@ -1,13 +1,52 @@
 // client/src/components/PWMealView.jsx — read-only meal detail modal
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { T, PWIcon2 } from '../tokens.jsx';
 
 function fmt(val, unit) {
   return val != null ? `${Math.round(val)}${unit}` : '—';
 }
 
-export default function PWMealView({ meal, onClose, onEdit }) {
+function toLocalInputValue(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgain }) {
+  const [loggingAgain, setLoggingAgain]   = useState(false);
+  const [logAgainAt, setLogAgainAt]       = useState('');
+  const [submitting, setSubmitting]       = useState(false);
+  const [logAgainError, setLogAgainError] = useState(null);
+
+  // Reset log-again state whenever the viewed meal changes
+  useEffect(() => {
+    setLoggingAgain(false);
+    setLogAgainAt('');
+    setSubmitting(false);
+    setLogAgainError(null);
+  }, [meal]);
+
   if (!meal) return null;
+
+  const onLogAgain = async () => {
+    setSubmitting(true);
+    setLogAgainError(null);
+    try {
+      const res = await fetch('/api/log-again', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: meal.id, loggedAt: new Date(logAgainAt).toISOString() }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error || 'Could not log again');
+      }
+      if (onLoggedAgain) onLoggedAgain(); else onClose();
+    } catch (e) {
+      setLogAgainError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const timeLabel = new Date(meal.created_at).toLocaleTimeString(undefined, {
     hour: 'numeric', minute: '2-digit',
@@ -124,8 +163,66 @@ export default function PWMealView({ meal, onClose, onEdit }) {
             </div>
           )}
 
+          {/* Log again — timestamp row (history only) */}
+          {origin === 'history' && loggingAgain && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="datetime-local"
+                value={logAgainAt}
+                onChange={(e) => setLogAgainAt(e.target.value)}
+                style={{
+                  flex: 1, minWidth: 0, border: `1.5px solid ${T.line}`, borderRadius: 10,
+                  padding: '10px 12px', fontSize: 14, fontFamily: 'inherit',
+                  color: T.ink, outline: 'none', background: '#fff',
+                }}
+              />
+              <button
+                onClick={onLogAgain}
+                disabled={submitting || !logAgainAt}
+                style={{
+                  padding: '10px 16px', borderRadius: 10, border: 'none',
+                  background: T.green, color: '#fff', fontWeight: 700,
+                  cursor: submitting || !logAgainAt ? 'default' : 'pointer',
+                  fontFamily: T.font, fontSize: 14,
+                  opacity: submitting || !logAgainAt ? 0.6 : 1,
+                }}
+              >
+                {submitting ? '…' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setLoggingAgain(false)}
+                style={{
+                  padding: '10px 12px', borderRadius: 10,
+                  border: `1.5px solid ${T.line}`, background: '#fff',
+                  cursor: 'pointer', fontFamily: T.font, fontSize: 14, color: T.inkSoft,
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {logAgainError && (
+            <div style={{ background: T.red50, color: T.red, borderRadius: 10, padding: '9px 12px', fontSize: 12.5 }}>
+              ⚠ {logAgainError}
+            </div>
+          )}
+
           {/* Footer buttons */}
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            {origin === 'history' && !loggingAgain && (
+              <button
+                onClick={() => { setLoggingAgain(true); setLogAgainAt(toLocalInputValue(new Date())); }}
+                style={{
+                  flex: 1, padding: '12px', borderRadius: 12,
+                  border: `1.5px solid ${T.line}`, background: '#fff',
+                  cursor: 'pointer', fontFamily: T.font, fontSize: 14,
+                  fontWeight: 600, color: T.inkSoft,
+                }}
+              >
+                ↻ Log again
+              </button>
+            )}
             <button
               onClick={onEdit}
               style={{

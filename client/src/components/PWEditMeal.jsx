@@ -26,26 +26,6 @@ export default function PWEditMeal({ meal, onBack, onSaved }) {
   const [editingIdx, setEditingIdx] = useState(null);
   const [draftQty, setDraftQty]   = useState('');
   const [draftUnit, setDraftUnit] = useState('');
-  const [loggingAgain, setLoggingAgain] = useState(false);
-
-  const onLogAgain = async () => {
-    setLoggingAgain(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/log-again', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: meal.id }),
-      });
-      if (!res.ok) throw new Error('Could not log again');
-      onSaved();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoggingAgain(false);
-    }
-  };
-
   const recalc = async (nextIngredients) => {
     setRecalculating(true);
     setError(null);
@@ -134,25 +114,16 @@ export default function PWEditMeal({ meal, onBack, onSaved }) {
     }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={onBack} style={{
-            width: 34, height: 34, borderRadius: 10, background: T.lineSoft,
-            border: 'none', display: 'grid', placeItems: 'center', cursor: 'pointer',
-          }}>
-            {PWIcon2.chevLeft(16, T.green)}
-          </button>
-          <div style={{ fontFamily: T.heading, fontSize: 20, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px' }}>
-            Edit Meal
-          </div>
-        </div>
-        <button onClick={onLogAgain} disabled={loggingAgain} style={{
-          background: '#fff', border: `1px solid ${T.line}`, borderRadius: 999,
-          padding: '6px 14px', fontSize: 12, color: T.inkSoft,
-          cursor: 'pointer', fontFamily: T.font,
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={onBack} style={{
+          width: 34, height: 34, borderRadius: 10, background: T.lineSoft,
+          border: 'none', display: 'grid', placeItems: 'center', cursor: 'pointer',
         }}>
-          {loggingAgain ? '…' : '↻ Log again'}
+          {PWIcon2.chevLeft(16, T.green)}
         </button>
+        <div style={{ fontFamily: T.heading, fontSize: 20, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px' }}>
+          Edit Meal
+        </div>
       </div>
 
       <Field label="Name">

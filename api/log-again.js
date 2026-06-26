@@ -10,8 +10,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { id } = req.body || {};
+  const { id, loggedAt } = req.body || {};
   if (!id) return res.status(400).json({ error: 'id is required' });
+
+  let createdAt = null;
+  if (loggedAt !== undefined) {
+    const d = new Date(loggedAt);
+    if (isNaN(d.getTime())) return res.status(400).json({ error: 'loggedAt is not a valid date' });
+    createdAt = d.toISOString();
+  }
 
   try {
     const { rows: existing } = await sql`select * from meal_logs where id = ${id} and user_id = ${req.user.id}`;
@@ -22,14 +29,15 @@ export default async function handler(req, res) {
     const { rows } = await sql`
       insert into meal_logs
         (user_id, name, serving, calories, carbs_g, protein_g, fat_g, fiber_g, sugar_g, sodium_mg,
-         health_score, fact, tips, mismatch, photo_url, meal_type, ingredients)
+         health_score, fact, tips, mismatch, photo_url, meal_type, ingredients, created_at)
       values
         (${req.user.id}, ${source.name}, ${source.serving}, ${source.calories},
          ${source.carbs_g}, ${source.protein_g}, ${source.fat_g},
          ${source.fiber_g}, ${source.sugar_g}, ${source.sodium_mg},
          ${source.health_score}, ${source.fact}, ${JSON.stringify(source.tips ?? [])},
          ${source.mismatch}, ${source.photo_url}, ${source.meal_type},
-         ${source.ingredients ? JSON.stringify(source.ingredients) : null})
+         ${source.ingredients ? JSON.stringify(source.ingredients) : null},
+         ${createdAt ?? sql`now()`})
       returning *
     `;
 
