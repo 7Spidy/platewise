@@ -1,12 +1,9 @@
 // client/src/components/PWReview.jsx
-import React, { useRef, useState } from 'react';
-import { toPng } from 'html-to-image';
+import React, { useState } from 'react';
 import { T, PWIcon2 } from '../tokens.jsx';
 
 export default function PWReview({ data, draft, onBack, onSaved }) {
   const [food, setFood]             = useState(data);
-  const cardRef                     = useRef(null);
-  const [exportToast, setExportToast]   = useState(null);
   const [recalculating, setRecalculating] = useState(false);
   const [saving, setSaving]         = useState(false);
   const [savedToLib, setSavedToLib] = useState(false);
@@ -111,21 +108,6 @@ export default function PWReview({ data, draft, onBack, onSaved }) {
     }
   };
 
-  const onExport = async () => {
-    if (!cardRef.current) return;
-    try {
-      const dataUrl = await toPng(cardRef.current, { cacheBust: true, backgroundColor: '#FFFFFF', pixelRatio: 2 });
-      const link = document.createElement('a');
-      link.download = `platewise-${food.name.toLowerCase().replace(/\s+/g, '-')}.png`;
-      link.href = dataUrl;
-      link.click();
-      setExportToast('Downloaded ✓');
-    } catch {
-      setExportToast('Export failed');
-    }
-    setTimeout(() => setExportToast(null), 2200);
-  };
-
   return (
     <div style={{
       width: '100%', minHeight: '100%', background: T.bg, fontFamily: T.font,
@@ -134,30 +116,20 @@ export default function PWReview({ data, draft, onBack, onSaved }) {
     }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={onBack} style={{
-            width: 34, height: 34, borderRadius: 10, background: T.lineSoft,
-            border: 'none', display: 'grid', placeItems: 'center', cursor: 'pointer',
-          }}>
-            {PWIcon2.chevLeft(16, T.green)}
-          </button>
-          <div style={{ fontFamily: T.heading, fontSize: 20, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px' }}>
-            Review
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button onClick={onBack} style={{
+          width: 34, height: 34, borderRadius: 10, background: T.lineSoft,
+          border: 'none', display: 'grid', placeItems: 'center', cursor: 'pointer',
+        }}>
+          {PWIcon2.chevLeft(16, T.green)}
+        </button>
+        <div style={{ fontFamily: T.heading, fontSize: 20, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px' }}>
+          Review
         </div>
-        <button onClick={onExport} title="Export as image" style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          padding: 4, display: 'grid', placeItems: 'center',
-        }}>{PWIcon2.download(18, T.inkMute)}</button>
       </div>
 
-      {exportToast && (
-        <div style={{ fontSize: 11.5, color: T.green, textAlign: 'right' }}>{exportToast}</div>
-      )}
-
       {/* Meal identity card */}
-      <div ref={cardRef} style={{
+      <div style={{
         display: 'flex', gap: 12, alignItems: 'center',
         background: '#fff', border: `1px solid ${T.line}`, borderRadius: 16, padding: 14,
         boxShadow: T.shadowSoft,

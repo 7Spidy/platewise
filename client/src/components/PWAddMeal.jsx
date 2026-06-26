@@ -131,14 +131,14 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
           alignItems: 'stretch', justifyContent: 'center', gap: 8,
           padding: '12px 16px', boxSizing: 'border-box', position: 'relative', zIndex: 11,
         }}>
-          <button onClick={() => cameraInputRef.current?.click()} style={{
+          <button onClick={() => { cameraInputRef.current?.click(); setShowPhotoMenu(false); }} style={{
             flex: 1, border: 'none', borderRadius: 10, background: '#fff',
             cursor: 'pointer', fontFamily: T.font, fontSize: 13.5, fontWeight: 600,
             color: T.ink, boxShadow: T.shadowSoft,
           }}>
             📷 Take Photo
           </button>
-          <button onClick={() => libraryInputRef.current?.click()} style={{
+          <button onClick={() => { libraryInputRef.current?.click(); setShowPhotoMenu(false); }} style={{
             flex: 1, border: 'none', borderRadius: 10, background: '#fff',
             cursor: 'pointer', fontFamily: T.font, fontSize: 13.5, fontWeight: 600,
             color: T.ink, boxShadow: T.shadowSoft,

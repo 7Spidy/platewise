@@ -35,29 +35,36 @@ export default function PWFactLoader({ label }) {
 
   return (
     <div style={{
-      background: '#fff', borderRadius: 18, padding: '28px 22px',
-      textAlign: 'center', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', gap: 14,
+      position: 'fixed', inset: 0, background: 'rgba(39,26,15,0.35)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 100, padding: 24,
     }}>
       <div style={{
-        width: 38, height: 38, borderRadius: '50%',
-        border: `3px solid ${T.line}`,
-        borderTopColor: T.green,
-        animation: 'pw-spin 0.9s linear infinite',
-        flexShrink: 0,
-      }} />
-      <div style={{
-        fontFamily: T.heading, fontSize: 15, fontWeight: 700, color: T.ink,
+        background: '#fff', borderRadius: 18, padding: '28px 22px',
+        width: '100%', maxWidth: 320, boxShadow: T.shadow,
+        textAlign: 'center', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', gap: 14,
       }}>
-        {label || 'Analysing…'}
-      </div>
-      <div style={{
-        fontSize: 13, color: T.inkSoft, lineHeight: 1.6,
-        fontStyle: 'italic',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.2s ease',
-      }}>
-        {fact}
+        <div style={{
+          width: 38, height: 38, borderRadius: '50%',
+          border: `3px solid ${T.line}`,
+          borderTopColor: T.green,
+          animation: 'pw-spin 0.9s linear infinite',
+          flexShrink: 0,
+        }} />
+        <div style={{
+          fontFamily: T.heading, fontSize: 15, fontWeight: 700, color: T.ink,
+        }}>
+          {label || 'Analysing…'}
+        </div>
+        <div style={{
+          fontSize: 13, color: T.inkSoft, lineHeight: 1.6,
+          fontStyle: 'italic',
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 0.2s ease',
+        }}>
+          {fact}
+        </div>
       </div>
     </div>
   );
