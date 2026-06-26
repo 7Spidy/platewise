@@ -531,7 +531,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   <label style={profileLabelStyle}>Gender</label>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {['male', 'female', 'other'].map((g) => (
+                    {['male', 'female'].map((g) => (
                       <button key={g} onClick={() => setProfileForm((f) => ({ ...f, gender: g }))} style={{
                         flex: 1, padding: '9px 0', borderRadius: 10, cursor: 'pointer', fontFamily: T.font,
                         fontSize: 13, fontWeight: profileForm.gender === g ? 600 : 400,

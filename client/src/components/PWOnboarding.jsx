@@ -175,7 +175,7 @@ export default function PWOnboarding({ onComplete }) {
 
         {currentStep === 'gender' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {['male', 'female', 'other'].map((g) => (
+            {['male', 'female'].map((g) => (
               <OptionButton key={g} selected={form.gender === g} onClick={() => set('gender', g)}>
                 {g.charAt(0).toUpperCase() + g.slice(1)}
               </OptionButton>
