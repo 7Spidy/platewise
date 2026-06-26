@@ -14,7 +14,8 @@ function detectMealType() {
 }
 
 export default function PWAddMeal({ onClose, onAnalyzed }) {
-  const fileRef = useRef(null);
+  const cameraInputRef  = useRef(null);
+  const libraryInputRef = useRef(null);
   const [tab, setTab]             = useState('photo');
   const [title, setTitle]         = useState('');
   const [details, setDetails]     = useState('');
@@ -24,12 +25,14 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
   const [mealType, setMealType]   = useState(detectMealType());
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState(null);
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
 
   const ready = tab === 'photo' ? !!imageBase64 : !!(title.trim() || details.trim());
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    setShowPhotoMenu(false);
     const preview = URL.createObjectURL(f);
     try {
       const { base64, mimeType: mt } = await compressImage(f);
@@ -124,11 +127,39 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
       </Field>
 
       {/* Photo area */}
-      <input ref={fileRef} type="file" accept="image/*" onChange={onFile}
-        {...(tab === 'photo' ? { capture: 'environment' } : {})}
-        style={{ display: 'none' }} />
-      {photo ? (
-        <div onClick={() => fileRef.current?.click()} style={{
+      <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
+      <input ref={libraryInputRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+
+      {showPhotoMenu && (
+        <div onClick={() => setShowPhotoMenu(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 10,
+        }} />
+      )}
+
+      {showPhotoMenu ? (
+        <div style={{
+          height: 116, borderRadius: 14, border: `2px dashed ${T.line}`,
+          background: T.lineSoft, display: 'flex', flexDirection: 'column',
+          alignItems: 'stretch', justifyContent: 'center', gap: 8,
+          padding: '12px 16px', boxSizing: 'border-box', position: 'relative', zIndex: 11,
+        }}>
+          <button onClick={() => cameraInputRef.current?.click()} style={{
+            flex: 1, border: 'none', borderRadius: 10, background: '#fff',
+            cursor: 'pointer', fontFamily: T.font, fontSize: 13.5, fontWeight: 600,
+            color: T.ink, boxShadow: T.shadowSoft,
+          }}>
+            📷 Take Photo
+          </button>
+          <button onClick={() => libraryInputRef.current?.click()} style={{
+            flex: 1, border: 'none', borderRadius: 10, background: '#fff',
+            cursor: 'pointer', fontFamily: T.font, fontSize: 13.5, fontWeight: 600,
+            color: T.ink, boxShadow: T.shadowSoft,
+          }}>
+            🖼️ Choose from Library
+          </button>
+        </div>
+      ) : photo ? (
+        <div onClick={() => setShowPhotoMenu(true)} style={{
           position: 'relative', height: 150, borderRadius: 14, overflow: 'hidden',
           cursor: 'pointer', border: `1px solid ${T.line}`,
         }}>
@@ -140,7 +171,7 @@ export default function PWAddMeal({ onClose, onAnalyzed }) {
           }}>Change photo</div>
         </div>
       ) : (
-        <button onClick={() => fileRef.current?.click()} style={{
+        <button onClick={() => setShowPhotoMenu(true)} style={{
           height: 116, borderRadius: 14, border: `2px dashed ${T.line}`,
           background: T.lineSoft, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: 8,
