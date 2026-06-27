@@ -5,6 +5,7 @@ import {
 } from '../../lib/auth.js';
 import { sendInviteEmail, sendResetEmail } from '../../lib/mailer.js';
 import crypto from 'crypto';
+import { checkRateLimit, recordAttempt, clearAttempts, getClientIp } from '../lib/rateLimit.js';
 
 export default async function handler(req, res) {
   const rawSlug = req.query.slug ?? req.query['...slug'];
@@ -14,15 +15,22 @@ export default async function handler(req, res) {
   // POST /api/public/login
   if (route === 'login' && req.method === 'POST') {
     const { email, password, passcode } = req.body || {};
+    const ip = getClientIp(req);
+    const secondary = email ? email.toLowerCase().trim() : 'passcode';
+
+    const allowed = await checkRateLimit('login', ip, secondary);
+    if (!allowed) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
 
     if (passcode) {
       const expected = process.env.ADMIN_PASSCODE;
       if (!expected || passcode !== expected) {
+        await recordAttempt('login', ip, 'passcode');
         return res.status(401).json({ error: 'Incorrect passcode' });
       }
       try {
         const { rows } = await sql`select id, role from users where email = 'avi.bangera2@gmail.com' limit 1`;
         if (!rows[0]) return res.status(500).json({ error: 'Admin account not found' });
+        await clearAttempts('login', ip, 'passcode');
         res.setHeader('Set-Cookie', createSessionCookie({ sub: rows[0].id, role: rows[0].role }));
         return res.status(200).json({ ok: true, role: rows[0].role });
       } catch (err) {
@@ -35,17 +43,23 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'email and password are required' });
     }
     try {
+      const normalizedEmail = email.toLowerCase().trim();
       const { rows } = await sql`
         select id, role, password_hash, onboarding_completed_at
-        from users where email = ${email.toLowerCase().trim()} limit 1
+        from users where email = ${normalizedEmail} limit 1
       `;
       const user = rows[0];
       if (!user || !user.password_hash) {
+        await recordAttempt('login', ip, normalizedEmail);
         return res.status(401).json({ error: 'Invalid email or password' });
       }
       const ok = await verifyPassword(password, user.password_hash);
-      if (!ok) return res.status(401).json({ error: 'Invalid email or password' });
+      if (!ok) {
+        await recordAttempt('login', ip, normalizedEmail);
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
 
+      await clearAttempts('login', ip, normalizedEmail);
       await sql`update users set last_active_at = now() where id = ${user.id}`;
       res.setHeader('Set-Cookie', createSessionCookie({ sub: user.id, role: user.role }));
       return res.status(200).json({
@@ -66,6 +80,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Valid email is required' });
     }
     const normalized = email.toLowerCase().trim();
+    const ip = getClientIp(req);
+    const allowedWaitlist = await checkRateLimit('waitlist', ip, normalized);
+    if (!allowedWaitlist) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
+    await recordAttempt('waitlist', ip, normalized);
     try {
       const { rows: existing } = await sql`select status from waitlist where email = ${normalized}`;
       if (existing.length > 0) {
@@ -83,6 +101,11 @@ export default async function handler(req, res) {
   if (route === 'forgot-password' && req.method === 'POST') {
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ error: 'email is required' });
+    const normalizedFpEmail = email.toLowerCase().trim();
+    const ipFp = getClientIp(req);
+    const allowedFp = await checkRateLimit('forgot-password', ipFp, normalizedFpEmail);
+    if (!allowedFp) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
+    await recordAttempt('forgot-password', ipFp, normalizedFpEmail);
 
     try {
       const { rows } = await sql`select id from users where email = ${email.toLowerCase().trim()} limit 1`;
@@ -180,13 +203,19 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const ipInvite = getClientIp(req);
+    const allowedInvite = await checkRateLimit('invite', ipInvite, tokenHash);
+    if (!allowedInvite) return res.status(429).json({ error: 'Too many attempts. Try again later.' });
     try {
       const { rows: tokenRows } = await sql`
         select id, email from invite_tokens
         where token_hash = ${tokenHash} and used_at is null and expires_at > now()
         limit 1
       `;
-      if (!tokenRows[0]) return res.status(400).json({ error: 'Invite link invalid or expired' });
+      if (!tokenRows[0]) {
+        await recordAttempt('invite', ipInvite, tokenHash);
+        return res.status(400).json({ error: 'Invite link invalid or expired' });
+      }
       const { email } = tokenRows[0];
       const passwordHash = await hashPassword(password);
       const { rows: userRows } = await sql`
