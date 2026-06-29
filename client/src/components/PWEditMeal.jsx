@@ -26,6 +26,9 @@ export default function PWEditMeal({ meal, onBack, onSaved }) {
   const [editingIdx, setEditingIdx] = useState(null);
   const [draftQty, setDraftQty]   = useState('');
   const [draftUnit, setDraftUnit] = useState('');
+  const [pendingNames, setPendingNames]           = useState([]);
+  const [newIngredientDraft, setNewIngredientDraft] = useState('');
+
   const recalc = async (nextIngredients) => {
     setRecalculating(true);
     setError(null);
@@ -69,16 +72,63 @@ export default function PWEditMeal({ meal, onBack, onSaved }) {
     recalc(next);
   };
 
+  const addPending = () => {
+    const trimmed = newIngredientDraft.trim();
+    if (!trimmed) return;
+    setPendingNames((p) => [...p, trimmed]);
+    setNewIngredientDraft('');
+  };
+  const removePending = (idx) => setPendingNames((p) => p.filter((_, i) => i !== idx));
+
   const onSave = async () => {
     setSaving(true);
     setError(null);
     try {
+      let currentIngredients = ingredients;
+      let currentCalories    = calories;
+      let currentMacros      = macros;
+      let currentOther       = other;
+
+      if (pendingNames.length > 0) {
+        setRecalculating(true);
+        try {
+          const existingParts = (ingredients || []).map((i) => `${i.quantity}${i.unit} ${i.name}`);
+          const details = `Ingredients: ${[...existingParts, ...pendingNames].join(', ')}`;
+
+          const doAnalyze = () => fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, details }),
+          });
+
+          let res = await doAnalyze();
+          if (!res.ok) {
+            await new Promise((r) => setTimeout(r, 500));
+            res = await doAnalyze();
+          }
+          if (!res.ok) throw new Error('Could not recalculate');
+
+          const updated = await res.json();
+          currentIngredients = updated.ingredients;
+          currentCalories    = updated.calories;
+          currentMacros      = updated.macros;
+          currentOther       = updated.other;
+          setIngredients(currentIngredients);
+          setCalories(currentCalories);
+          setMacros(currentMacros);
+          setOther(currentOther);
+          setPendingNames([]);
+        } finally {
+          setRecalculating(false);
+        }
+      }
+
       const res = await fetch('/api/meals', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: meal.id, name, serving: meal.serving, calories,
-          macros, other, ingredients,
+          id: meal.id, name, serving: meal.serving, calories: currentCalories,
+          macros: currentMacros, other: currentOther, ingredients: currentIngredients,
           healthScore: meal.health_score, fact: meal.fact, tips: meal.tips,
           mismatch: meal.mismatch, mealType, loggedAt: new Date(loggedAt).toISOString(),
         }),
@@ -105,6 +155,48 @@ export default function PWEditMeal({ meal, onBack, onSaved }) {
       setError('Could not delete');
     }
   };
+
+  const addIngredientUI = (
+    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+      <input
+        value={newIngredientDraft}
+        onChange={(e) => setNewIngredientDraft(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && addPending()}
+        placeholder="Add ingredient…"
+        style={{ ...inputStyle, flex: 1, width: 'auto', padding: '9px 12px', fontSize: 13.5 }}
+      />
+      <button
+        onClick={addPending}
+        disabled={!newIngredientDraft.trim()}
+        style={{
+          background: newIngredientDraft.trim() ? T.green : T.lineSoft,
+          color: newIngredientDraft.trim() ? '#fff' : T.inkMute,
+          border: 'none', borderRadius: 10, padding: '9px 14px',
+          fontSize: 13.5, fontWeight: 600, cursor: newIngredientDraft.trim() ? 'pointer' : 'default',
+          fontFamily: 'inherit', flexShrink: 0,
+        }}
+      >Add</button>
+    </div>
+  );
+
+  const pendingListUI = pendingNames.length > 0 && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+      {pendingNames.map((pName, idx) => (
+        <div key={`pending-${idx}`} style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          background: T.green50, border: `1.5px dashed ${T.line}`, borderRadius: 10, padding: '9px 12px',
+        }}>
+          <span style={{ fontSize: 13.5, fontWeight: 500, color: T.inkMute }}>{pName}</span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 10.5, color: T.inkFaint }}>pending — will calculate on save</span>
+            <button onClick={() => removePending(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex' }}>
+              {PWIcon2.trash(13)}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div style={{
@@ -142,54 +234,60 @@ export default function PWEditMeal({ meal, onBack, onSaved }) {
       </div>
 
       {/* Ingredients */}
-      {ingredients ? (
-        <div>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: T.inkMute, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-            Ingredients — tap qty to edit
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {ingredients.map((ing, idx) => (
-              <div key={idx} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                background: '#fff', border: `1px solid ${T.lineSoft}`, borderRadius: 10, padding: '9px 12px',
-              }}>
-                <span style={{ fontSize: 13.5, fontWeight: 500, color: T.ink }}>{ing.name}</span>
-                {editingIdx === idx ? (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <input autoFocus value={draftQty} onChange={(e) => setDraftQty(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-                      style={miniInput} />
-                    <input value={draftUnit} onChange={(e) => setDraftUnit(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
-                      style={{ ...miniInput, width: 40 }} />
-                    <button onClick={commitEdit} style={{
-                      background: T.green, color: '#fff', border: 'none',
-                      borderRadius: 7, fontSize: 11, padding: '5px 8px', cursor: 'pointer',
-                    }}>✓</button>
-                    <button onClick={() => removeIngredient(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                      {PWIcon2.trash(13)}
-                    </button>
-                  </div>
-                ) : (
-                  <div onClick={() => startEdit(idx)} style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                    <span style={{ fontSize: 12.5, color: T.inkMute }}>{ing.quantity}{ing.unit}</span>
-                    {PWIcon2.edit(12)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          {recalculating && (
-            <div style={{ marginTop: 8 }}>
-              <PWFactLoader label="Recalculating…" />
+      <div>
+        {ingredients ? (
+          <>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: T.inkMute, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+              Ingredients — tap qty to edit
             </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ fontSize: 12.5, color: T.inkFaint, background: T.lineSoft, borderRadius: 10, padding: '12px 14px' }}>
-          This meal was logged before per-ingredient tracking — edit totals directly below.
-        </div>
-      )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {ingredients.map((ing, idx) => (
+                <div key={idx} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  background: '#fff', border: `1px solid ${T.lineSoft}`, borderRadius: 10, padding: '9px 12px',
+                }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 500, color: T.ink }}>{ing.name}</span>
+                  {editingIdx === idx ? (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input autoFocus value={draftQty} onChange={(e) => setDraftQty(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
+                        style={miniInput} />
+                      <input value={draftUnit} onChange={(e) => setDraftUnit(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
+                        style={{ ...miniInput, width: 40 }} />
+                      <button onClick={commitEdit} style={{
+                        background: T.green, color: '#fff', border: 'none',
+                        borderRadius: 7, fontSize: 11, padding: '5px 8px', cursor: 'pointer',
+                      }}>✓</button>
+                      <button onClick={() => removeIngredient(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                        {PWIcon2.trash(13)}
+                      </button>
+                    </div>
+                  ) : (
+                    <div onClick={() => startEdit(idx)} style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                      <span style={{ fontSize: 12.5, color: T.inkMute }}>{ing.quantity}{ing.unit}</span>
+                      {PWIcon2.edit(12)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 12.5, color: T.inkFaint, background: T.lineSoft, borderRadius: 10, padding: '12px 14px' }}>
+            This meal was logged before per-ingredient tracking — edit totals directly below.
+          </div>
+        )}
+
+        {pendingListUI}
+        {addIngredientUI}
+
+        {recalculating && (
+          <div style={{ marginTop: 8 }}>
+            <PWFactLoader label="Recalculating…" />
+          </div>
+        )}
+      </div>
 
       {/* Numeric totals */}
       <div style={{ display: 'flex', gap: 8 }}>
@@ -203,10 +301,11 @@ export default function PWEditMeal({ meal, onBack, onSaved }) {
         <div style={{ background: T.red50, color: T.red, borderRadius: 12, padding: '10px 14px', fontSize: 12.5 }}>⚠ {error}</div>
       )}
 
-      <button onClick={onSave} disabled={saving} style={{
+      <button onClick={onSave} disabled={saving || recalculating} style={{
         background: T.green, color: '#fff', border: 'none', borderRadius: 14,
         padding: '14px', fontSize: 15, fontWeight: 700, cursor: 'pointer',
         fontFamily: T.font, boxShadow: '0 6px 20px rgba(196,103,74,0.28)',
+        opacity: (saving || recalculating) ? 0.6 : 1,
       }}>
         {saving ? 'Saving…' : 'Save changes'}
       </button>
