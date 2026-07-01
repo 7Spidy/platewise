@@ -47,6 +47,10 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
   const [busyChip, setBusyChip]         = useState(null);
   const [error, setError]               = useState(null);
   const [viewingMeal, setViewingMeal]   = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportNotice, setExportNotice] = useState(null); // { type: 'error' | 'info', text: string }
+  const [exportRange, setExportRange] = useState('all');
+  const [showExportPicker, setShowExportPicker] = useState(false);
 
   const isReadOnly = dateOffset !== 0;
 
@@ -144,12 +148,46 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         setError(b.error || 'Could not save targets');
         return;
       }
-      setSettings(await res.json());
+      const updated = await res.json();
+      setSettings((prev) => ({ ...prev, ...updated }));
       setShowSettings(false);
     } catch {
       setError('Could not save targets');
     }
   };
+
+  async function handleExportData(range) {
+    setShowGearMenu(false);
+    setShowExportPicker(false);
+    setExportLoading(true);
+    setExportNotice(null);
+    try {
+      const res = await fetch(`/api/me/export?range=${range}`);
+      if (res.status === 429) {
+        const data = await res.json();
+        setExportNotice({ type: 'error', text: data.message || 'You can only export once per hour. Try again soon.' });
+        return;
+      }
+      if (!res.ok) {
+        setExportNotice({ type: 'error', text: 'Export failed. Please try again.' });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const rangeLabel = range === 'all' ? 'all' : `last${range}`;
+      a.download = `platewise-export-${rangeLabel}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportNotice({ type: 'error', text: 'Export failed. Please try again.' });
+    } finally {
+      setExportLoading(false);
+    }
+  }
 
   async function openProfileEditor() {
     setProfileError('');
@@ -235,12 +273,12 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
             fontSize: 24, fontWeight: 700, color: T.ink,
             letterSpacing: '-0.3px', lineHeight: 1.2,
           }}>
-            {getGreeting()}
+            {getGreeting(settings?.name)}
           </div>
         </div>
         <div style={{ position: 'relative' }}>
           <button
-            onClick={() => setShowGearMenu((v) => !v)}
+            onClick={() => { setShowGearMenu((v) => !v); setExportNotice(null); setShowExportPicker(false); }}
             style={{
               width: 36, height: 36, borderRadius: 10, background: '#fff',
               border: `1px solid ${T.line}`, display: 'grid', placeItems: 'center',
@@ -275,8 +313,54 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
                   }}>
                   Edit Profile
                 </button>
+                <button
+                  onClick={() => setShowExportPicker((v) => !v)}
+                  disabled={exportLoading}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left', padding: '11px 14px',
+                    border: `1px solid ${T.line}`, borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
+                    background: 'none', cursor: exportLoading ? 'default' : 'pointer',
+                    fontFamily: T.font, fontSize: 13.5, color: T.ink, opacity: exportLoading ? 0.6 : 1,
+                  }}>
+                  {exportLoading ? 'Exporting…' : 'Export Data'}
+                </button>
+                {showExportPicker && (
+                  <div style={{ borderTop: `1px solid ${T.line}` }}>
+                    {[
+                      { label: 'All', value: 'all' },
+                      { label: 'Last 90 days', value: '90' },
+                      { label: 'Last 30 days', value: '30' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleExportData(opt.value)}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px 9px 24px',
+                          border: 'none', background: 'none', cursor: 'pointer',
+                          fontFamily: T.font, fontSize: 13, color: T.ink,
+                        }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
+          )}
+          {exportNotice && (
+            <div style={{
+              position: 'absolute', top: 42, right: 0, zIndex: 40,
+              background: T.red50, border: `1px solid ${T.red}`,
+              borderRadius: 10, padding: '9px 12px', minWidth: 220, maxWidth: 280,
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              boxShadow: T.shadow,
+            }}>
+              <span style={{ fontSize: 12.5, color: T.red, flex: 1 }}>{exportNotice.text}</span>
+              <button onClick={() => setExportNotice(null)} style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                color: T.red, fontSize: 16, lineHeight: 1, flexShrink: 0,
+              }}>×</button>
+            </div>
           )}
         </div>
       </div>

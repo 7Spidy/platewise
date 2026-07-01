@@ -10,6 +10,7 @@ function toTargetsShape(row) {
     target_carbs_g: row.macro_carbs_g,
     target_fat_g: row.macro_fat_g,
     manually_edited: row.manually_edited,
+    name: row.name,
   };
 }
 import { calcTarget, inchesToCm, lbsToKg } from '../../lib/calorie.js';
@@ -146,14 +147,20 @@ export default async function handler(req, res) {
   if (route === 'settings' && req.method === 'GET') {
     if (!requireAuth(req, res)) return;
     try {
-      const { rows } = await sql`select * from user_settings where user_id = ${req.user.id}`;
-      if (rows.length === 0) {
+      const { rows } = await sql`
+        select s.*, u.name
+        from users u
+        left join user_settings s on s.user_id = u.id
+        where u.id = ${req.user.id}
+      `;
+      if (rows[0]?.calorie_target == null) {
         return res.status(200).json(toTargetsShape({
           calorie_target: 2200,
           macro_protein_g: 180,
           macro_carbs_g: 200,
           macro_fat_g: 70,
           manually_edited: false,
+          name: rows[0]?.name,
         }));
       }
       return res.status(200).json(toTargetsShape(rows[0]));
@@ -228,6 +235,80 @@ export default async function handler(req, res) {
       return res.status(200).json({ limit, remaining, blocked, nextAvailableAt });
     } catch (err) {
       console.error('GET /api/me/scan-remaining failed:', err);
+      return res.status(500).json({ error: 'Something went wrong' });
+    }
+  }
+
+  // GET /api/me/export
+  if (route === 'export' && req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    try {
+      const { rows: userRows } = await sql`select last_export_at from users where id = ${req.user.id}`;
+      const lastExportAt = userRows[0]?.last_export_at;
+      if (lastExportAt) {
+        const lastMs = new Date(lastExportAt).getTime();
+        const nowMs = Date.now();
+        const sixtyMinMs = 60 * 60 * 1000;
+        if (nowMs - lastMs < sixtyMinMs) {
+          const nextAvailableAt = new Date(lastMs + sixtyMinMs);
+          const minutesRemaining = Math.ceil((nextAvailableAt.getTime() - nowMs) / 60000);
+          return res.status(429).json({
+            error: 'rate_limited',
+            message: `You can export again in ${minutesRemaining} minute${minutesRemaining === 1 ? '' : 's'}.`,
+            nextAvailableAt: nextAvailableAt.toISOString(),
+          });
+        }
+      }
+      const range = ['30', '90', 'all'].includes(req.query.range) ? req.query.range : '90';
+      const now = new Date();
+      let fromDate = null;
+      if (range === '30') fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      if (range === '90') fromDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const { rows: mealRows } = fromDate
+        ? await sql`
+            select created_at, name, serving, meal_type, calories, carbs_g, protein_g, fat_g,
+                   fiber_g, sugar_g, sodium_mg, health_score, ingredients
+            from meal_logs
+            where user_id = ${req.user.id} and created_at >= ${fromDate.toISOString()}
+            order by created_at asc
+          `
+        : await sql`
+            select created_at, name, serving, meal_type, calories, carbs_g, protein_g, fat_g,
+                   fiber_g, sugar_g, sodium_mg, health_score, ingredients
+            from meal_logs
+            where user_id = ${req.user.id}
+            order by created_at asc
+          `;
+      const meals = mealRows.map((r) => ({
+        logged_at: new Date(r.created_at).toISOString(),
+        name: r.name,
+        serving: r.serving,
+        meal_type: r.meal_type,
+        calories: r.calories,
+        protein_g: r.protein_g,
+        carbs_g: r.carbs_g,
+        fat_g: r.fat_g,
+        fiber_g: r.fiber_g,
+        sugar_g: r.sugar_g,
+        sodium_mg: r.sodium_mg,
+        health_score: r.health_score,
+        ingredients: r.ingredients,
+      }));
+      const payload = {
+        app: 'Platewise',
+        exported_at: now.toISOString(),
+        period: { from: fromDate ? fromDate.toISOString() : null, to: now.toISOString(), range },
+        meal_count: meals.length,
+        meals,
+      };
+      await sql`update users set last_export_at = now() where id = ${req.user.id}`;
+      const rangeLabel = range === 'all' ? 'all' : `last${range}`;
+      const filename = `platewise-export-${rangeLabel}-${now.toISOString().slice(0, 10)}.json`;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.status(200).send(JSON.stringify(payload, null, 2));
+    } catch (err) {
+      console.error('GET /api/me/export failed:', err);
       return res.status(500).json({ error: 'Something went wrong' });
     }
   }
