@@ -49,6 +49,8 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
   const [viewingMeal, setViewingMeal]   = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportNotice, setExportNotice] = useState(null); // { type: 'error' | 'info', text: string }
+  const [exportRange, setExportRange] = useState('all');
+  const [showExportPicker, setShowExportPicker] = useState(false);
 
   const isReadOnly = dateOffset !== 0;
 
@@ -146,19 +148,21 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         setError(b.error || 'Could not save targets');
         return;
       }
-      setSettings(await res.json());
+      const updated = await res.json();
+      setSettings((prev) => ({ ...prev, ...updated }));
       setShowSettings(false);
     } catch {
       setError('Could not save targets');
     }
   };
 
-  async function handleExportData() {
+  async function handleExportData(range) {
     setShowGearMenu(false);
+    setShowExportPicker(false);
     setExportLoading(true);
     setExportNotice(null);
     try {
-      const res = await fetch('/api/me/export');
+      const res = await fetch(`/api/me/export?range=${range}`);
       if (res.status === 429) {
         const data = await res.json();
         setExportNotice({ type: 'error', text: data.message || 'You can only export once per hour. Try again soon.' });
@@ -172,7 +176,8 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `platewise-export-${new Date().toISOString().slice(0, 10)}.json`;
+      const rangeLabel = range === 'all' ? 'all' : `last${range}`;
+      a.download = `platewise-export-${rangeLabel}-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -268,12 +273,12 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
             fontSize: 24, fontWeight: 700, color: T.ink,
             letterSpacing: '-0.3px', lineHeight: 1.2,
           }}>
-            {getGreeting()}
+            {getGreeting(settings?.name)}
           </div>
         </div>
         <div style={{ position: 'relative' }}>
           <button
-            onClick={() => { setShowGearMenu((v) => !v); setExportNotice(null); }}
+            onClick={() => { setShowGearMenu((v) => !v); setExportNotice(null); setShowExportPicker(false); }}
             style={{
               width: 36, height: 36, borderRadius: 10, background: '#fff',
               border: `1px solid ${T.line}`, display: 'grid', placeItems: 'center',
@@ -309,7 +314,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
                   Edit Profile
                 </button>
                 <button
-                  onClick={handleExportData}
+                  onClick={() => setShowExportPicker((v) => !v)}
                   disabled={exportLoading}
                   style={{
                     display: 'block', width: '100%', textAlign: 'left', padding: '11px 14px',
@@ -319,6 +324,26 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
                   }}>
                   {exportLoading ? 'Exporting…' : 'Export Data'}
                 </button>
+                {showExportPicker && (
+                  <div style={{ borderTop: `1px solid ${T.line}` }}>
+                    {[
+                      { label: 'All', value: 'all' },
+                      { label: 'Last 90 days', value: '90' },
+                      { label: 'Last 30 days', value: '30' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => handleExportData(opt.value)}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px 9px 24px',
+                          border: 'none', background: 'none', cursor: 'pointer',
+                          fontFamily: T.font, fontSize: 13, color: T.ink,
+                        }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}

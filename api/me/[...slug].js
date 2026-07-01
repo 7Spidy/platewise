@@ -10,6 +10,7 @@ function toTargetsShape(row) {
     target_carbs_g: row.macro_carbs_g,
     target_fat_g: row.macro_fat_g,
     manually_edited: row.manually_edited,
+    name: row.name,
   };
 }
 import { calcTarget, inchesToCm, lbsToKg } from '../../lib/calorie.js';
@@ -146,14 +147,20 @@ export default async function handler(req, res) {
   if (route === 'settings' && req.method === 'GET') {
     if (!requireAuth(req, res)) return;
     try {
-      const { rows } = await sql`select * from user_settings where user_id = ${req.user.id}`;
-      if (rows.length === 0) {
+      const { rows } = await sql`
+        select s.*, u.name
+        from users u
+        left join user_settings s on s.user_id = u.id
+        where u.id = ${req.user.id}
+      `;
+      if (rows[0]?.calorie_target == null) {
         return res.status(200).json(toTargetsShape({
           calorie_target: 2200,
           macro_protein_g: 180,
           macro_carbs_g: 200,
           macro_fat_g: 70,
           manually_edited: false,
+          name: rows[0]?.name,
         }));
       }
       return res.status(200).json(toTargetsShape(rows[0]));
@@ -252,15 +259,26 @@ export default async function handler(req, res) {
           });
         }
       }
+      const range = ['30', '90', 'all'].includes(req.query.range) ? req.query.range : '90';
       const now = new Date();
-      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-      const { rows: mealRows } = await sql`
-        select created_at, name, serving, meal_type, calories, carbs_g, protein_g, fat_g,
-               fiber_g, sugar_g, sodium_mg, health_score, ingredients
-        from meal_logs
-        where user_id = ${req.user.id} and created_at >= now() - interval '90 days'
-        order by created_at asc
-      `;
+      let fromDate = null;
+      if (range === '30') fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      if (range === '90') fromDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const { rows: mealRows } = fromDate
+        ? await sql`
+            select created_at, name, serving, meal_type, calories, carbs_g, protein_g, fat_g,
+                   fiber_g, sugar_g, sodium_mg, health_score, ingredients
+            from meal_logs
+            where user_id = ${req.user.id} and created_at >= ${fromDate.toISOString()}
+            order by created_at asc
+          `
+        : await sql`
+            select created_at, name, serving, meal_type, calories, carbs_g, protein_g, fat_g,
+                   fiber_g, sugar_g, sodium_mg, health_score, ingredients
+            from meal_logs
+            where user_id = ${req.user.id}
+            order by created_at asc
+          `;
       const meals = mealRows.map((r) => ({
         logged_at: new Date(r.created_at).toISOString(),
         name: r.name,
@@ -279,12 +297,13 @@ export default async function handler(req, res) {
       const payload = {
         app: 'Platewise',
         exported_at: now.toISOString(),
-        period: { from: ninetyDaysAgo.toISOString(), to: now.toISOString() },
+        period: { from: fromDate ? fromDate.toISOString() : null, to: now.toISOString(), range },
         meal_count: meals.length,
         meals,
       };
       await sql`update users set last_export_at = now() where id = ${req.user.id}`;
-      const filename = `platewise-export-${now.toISOString().slice(0, 10)}.json`;
+      const rangeLabel = range === 'all' ? 'all' : `last${range}`;
+      const filename = `platewise-export-${rangeLabel}-${now.toISOString().slice(0, 10)}.json`;
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       return res.status(200).send(JSON.stringify(payload, null, 2));
