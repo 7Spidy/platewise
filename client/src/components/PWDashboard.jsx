@@ -1,6 +1,6 @@
 // client/src/components/PWDashboard.jsx
 import React, { useEffect, useState, useMemo } from 'react';
-import { T, PWRing, PWIcon2, BottomNav, getGreeting, isoDate } from '../tokens.jsx';
+import { T, PWRing, PWIcon2, BottomNav, getGreeting, isoDate, getFoodEmoji } from '../tokens.jsx';
 import PWMealView from './PWMealView.jsx';
 import PWFeedbackSheet from './PWFeedbackSheet.jsx';
 import { ACTIVITY_OPTIONS, GOAL_OPTIONS } from './PWOnboarding.jsx';
@@ -537,8 +537,16 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
                     cursor: 'pointer', fontFamily: T.font,
                     textAlign: 'left', width: '100%',
                   }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 500, color: T.ink }}>{m.name}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: T.green }}>{Math.round(m.calories)}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                      <span style={{ fontSize: 15, flexShrink: 0 }}>{getFoodEmoji(m.name)}</span>
+                      <span style={{
+                        fontSize: 13.5, fontWeight: 500, color: T.ink,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{m.name}</span>
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: T.green, flexShrink: 0, marginLeft: 8 }}>
+                      {Math.round(m.calories)}
+                    </span>
                   </button>
                 )) : (
                   <div style={{ fontSize: 12.5, color: T.inkFaint, padding: '0 16px 12px' }}>Nothing logged yet</div>

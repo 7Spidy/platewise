@@ -59,6 +59,41 @@ export function isoDate(d) {
   return date.toISOString().slice(0, 10);
 }
 
+// Ordered list is irrelevant to matching, getFoodEmoji() always picks the
+// longest matching keyword so more specific phrases naturally outrank generic ones
+// (e.g. "chicken biryani" beats "chicken").
+const FOOD_EMOJI_MAP = [
+  ['chicken biryani', '🍚'], ['biryani', '🍚'], ['fried rice', '🍚'], ['rice', '🍚'],
+  ['masala omelette', '🍳'], ['omelette', '🍳'], ['omelet', '🍳'], ['egg', '🍳'],
+  ['butter chicken', '🍛'], ['chicken curry', '🍛'], ['curry', '🍛'], ['chicken', '🍗'],
+  ['salmon', '🐟'], ['fish', '🐟'], ['shrimp', '🍤'], ['prawn', '🍤'],
+  ['paneer', '🧀'], ['cheese', '🧀'], ['yogurt', '🥣'], ['curd', '🥣'],
+  ['dal', '🍲'], ['lentil', '🍲'], ['soup', '🍲'],
+  ['ramen', '🍜'], ['noodle', '🍜'], ['pasta', '🍝'], ['spaghetti', '🍝'],
+  ['pizza', '🍕'], ['sandwich', '🥪'], ['burrito', '🌯'], ['wrap', '🌯'], ['taco', '🌮'],
+  ['salad', '🥗'], ['avocado toast', '🥑'], ['avocado', '🥑'], ['toast', '🍞'], ['bread', '🍞'],
+  ['almond', '🥜'], ['peanut', '🥜'], ['nut', '🥜'],
+  ['banana', '🍌'], ['apple', '🍎'], ['orange', '🍊'], ['fruit', '🍎'],
+  ['coffee', '☕'], ['tea', '🍵'],
+  ['protein shake', '🥤'], ['shake', '🥤'], ['smoothie', '🥤'], ['soda', '🥤'], ['juice', '🧃'], ['milk', '🥛'],
+  ['chocolate', '🍫'], ['cake', '🍰'], ['cookie', '🍪'], ['biscuit', '🍪'],
+  ['pancake', '🥞'], ['waffle', '🧇'],
+  ['steak', '🥩'], ['beef', '🥩'], ['mutton', '🥩'], ['pork', '🥓'], ['bacon', '🥓'],
+];
+const FOOD_EMOJI_FALLBACK = '🍽️';
+
+export function getFoodEmoji(name) {
+  if (!name) return FOOD_EMOJI_FALLBACK;
+  const lower = name.toLowerCase();
+  let best = null;
+  for (const [keyword, emoji] of FOOD_EMOJI_MAP) {
+    if (lower.includes(keyword) && (!best || keyword.length > best[0].length)) {
+      best = [keyword, emoji];
+    }
+  }
+  return best ? best[1] : FOOD_EMOJI_FALLBACK;
+}
+
 export function getGreeting(name = '') {
   const h = new Date().getHours();
   const greeting = h >= 5 && h < 12 ? 'Good morning'
