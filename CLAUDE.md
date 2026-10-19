@@ -58,7 +58,7 @@ Response (validated server-side — 502 if shape is wrong):
 
 | Decision | Why |
 |---|---|
-| `claude-haiku-4-5-20251001` | ~3x cheaper than Sonnet (~₹0.20/scan vs ₹0.80) |
+| `claude-haiku-5-5` (defined in `lib/model.js`) | Cheapest current Claude tier: $0.10/$0.50 per M tokens, roughly ₹0.02–₹0.03 per scan (estimate) |
 | Forced tool use (`tool_choice: { type: 'tool', name: 'record_nutrition' }`) | Structurally enforces JSON schema; no parsing or fence-stripping needed |
 | Images compressed to 600px JPEG client-side | Cuts image tokens ~44%; HEIC/HEIF handled safely via canvas re-encode |
 | `max_tokens: 1024` | Actual output is ~250–300 tokens; 1024 is safe headroom |
@@ -86,7 +86,7 @@ Response (validated server-side — 502 if shape is wrong):
 | `meal_type` column nullable, unused by UI | Reserved for future breakfast/lunch/dinner tagging without requiring a migration |
 
 ## What NOT to change without a reason
-- **Model**: do not switch away from `claude-haiku-4-5-20251001` without re-benchmarking cost + quality
+- **Model**: do not switch away from `claude-haiku-5-5` without re-benchmarking cost and quality, and update `lib/cost.js` rates with any model change
 - **`tool_choice`**: must stay `{ type: 'tool', name: 'record_nutrition' }` — forced, not `auto`
 - **Image max**: do not increase above 600px — extra resolution doesn't improve nutrition accuracy
 - **`max_tokens`**: do not raise above 1024 without profiling actual output sizes

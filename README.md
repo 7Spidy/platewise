@@ -8,7 +8,7 @@ Personal food nutrition analyser. Describe a meal and optionally upload a photo 
 - **Backend** — Vercel serverless functions under `api/`; Express dev server at `server/server.js` mirrors them locally
 - **Database** — Vercel Postgres (`meal_logs`, `saved_meals`, `saved_ingredients`, `user_settings` tables)
 - **Storage** — Vercel Blob (meal photos)
-- **LLM** — `claude-haiku-4-5-20251001` with forced tool use for structured nutrition output
+- **LLM** — `claude-haiku-5-5` with forced tool use for structured nutrition output
 
 ## Features
 

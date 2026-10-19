@@ -2,17 +2,17 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { calcCostUsd, calcCostInr, calcCost } from '../lib/cost.js';
 
 describe('calcCostUsd', () => {
-  it('input tokens at $1/M', () => {
-    expect(calcCostUsd(1_000_000, 0)).toBeCloseTo(1.0, 6);
+  it('input tokens at $0.10/M', () => {
+    expect(calcCostUsd(1_000_000, 0)).toBeCloseTo(0.10, 6);
   });
 
-  it('output tokens at $5/M', () => {
-    expect(calcCostUsd(0, 1_000_000)).toBeCloseTo(5.0, 6);
+  it('output tokens at $0.50/M', () => {
+    expect(calcCostUsd(0, 1_000_000)).toBeCloseTo(0.50, 6);
   });
 
-  it('Haiku 4.5 typical scan: ~700 input, ~250 output', () => {
-    const usd = calcCostUsd(700, 250);
-    expect(usd).toBeCloseTo(700 / 1_000_000 + 250 * 5 / 1_000_000, 8);
+  it('Haiku 5.5 typical scan: ~900 input, ~330 output', () => {
+    const usd = calcCostUsd(900, 330);
+    expect(usd).toBeCloseTo(900 * 0.10 / 1e6 + 330 * 0.50 / 1e6, 10);
   });
 
   it('zero tokens = zero cost', () => {

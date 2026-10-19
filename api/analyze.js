@@ -1,9 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sql } from '@vercel/postgres';
 import { requireAuth } from '../lib/auth.js';
-import { validateNutritionPayload } from '../lib/schema.js';
 import { windowStart, calcLimit, calcRemaining, isBlocked, calcNextAvailable } from '../lib/scanLimit.js';
 import { calcCost } from '../lib/cost.js';
+import { ANALYZE_MODEL } from '../lib/model.js';
+import { interpretResponse } from '../lib/interpretResponse.js';
 
 const client = new Anthropic();
 
@@ -155,7 +156,7 @@ export default async function handler(req, res) {
 
   try {
     const response = await callWithRetry({
-      model: 'claude-haiku-4-5-20251001',
+      model: ANALYZE_MODEL,
       max_tokens: 1536,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       tools: [{ ...NUTRITION_TOOL, cache_control: { type: 'ephemeral' } }],
@@ -163,18 +164,16 @@ export default async function handler(req, res) {
       messages: [{ role: 'user', content: userContent }],
     });
 
-    const toolUse = response.content.find((b) => b.type === 'tool_use');
-    if (!toolUse) {
-      console.error('No tool_use block in response:', JSON.stringify(response.content));
-      return res.status(502).json({ error: 'Model did not return nutrition data' });
+    const result = interpretResponse(response);
+    if (!result.ok) {
+      console.error(`Analyze failed (${result.reason}):`, {
+        stop_reason: response?.stop_reason,
+        fields: result.fields,
+        content: JSON.stringify(response?.content),
+      });
+      return res.status(result.status).json({ error: result.error });
     }
-
-    const parsed = toolUse.input;
-    const errors = validateNutritionPayload(parsed);
-    if (errors.length > 0) {
-      console.error('Schema validation failed on fields:', errors, parsed);
-      return res.status(502).json({ error: `Invalid model response: ${errors.join(', ')}` });
-    }
+    const parsed = result.data;
 
     // Log usage
     try {
