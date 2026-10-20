@@ -19,7 +19,7 @@ export default function PWLeader({ label, value, unit, onClick, right, strong = 
         flex: '1 1 auto', minWidth: 12, borderBottom: '2px dotted rgba(23,54,42,0.22)',
         transform: 'translateY(-4px)',
       }} />
-      <span style={{ fontWeight: strong ? 600 : 400, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', flexShrink: 0 }}>
+      <span style={{ fontWeight: strong ? 600 : 400, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1, maxWidth: '60%' }}>
         {value}
         {unit ? <span style={{ color: T.inkMute, fontSize: 15, fontWeight: 400 }}> {unit}</span> : null}
       </span>

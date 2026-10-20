@@ -179,8 +179,8 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
           {summary && (
             <section style={{ background: T.tint, borderRadius: T.rCard, padding: '14px 20px', margin: '22px 0 14px' }}>
               <PWLeader label="Daily average" value={summary.avg != null ? summary.avg.toLocaleString() : '–'} unit={summary.avg != null ? 'kcal' : undefined} />
-              <PWLeader label="Over target" value={`${summary.overCount} of ${summary.loggedDays}`} unit="days" />
-              {summary.top && <PWLeader label="Most logged" value={summary.top.name} />}
+              <PWLeader label="Over target" value={`${summary.overCount} of ${summary.loggedDays}`} unit={summary.loggedDays === 1 ? 'day' : 'days'} />
+              {summary.top && summary.top.n >= 2 && <PWLeader label="Most logged" value={summary.top.name} />}
             </section>
           )}
 
