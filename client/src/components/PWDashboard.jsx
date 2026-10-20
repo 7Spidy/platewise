@@ -1,56 +1,43 @@
-// client/src/components/PWDashboard.jsx
+// client/src/components/PWDashboard.jsx — "Today"
 import React, { useEffect, useState, useMemo } from 'react';
-import { T, PWRing, PWIcon2, BottomNav, getGreeting, isoDate, getFoodEmoji } from '../tokens.jsx';
+import { T, PWIcon2, getGreeting, isoDate } from '../tokens.jsx';
+import { detectMealType, logSavedMeal } from '../lib/mealType.js';
+import { macroNudge } from '../lib/nudge.js';
 import PWMealView from './PWMealView.jsx';
-import PWFeedbackSheet from './PWFeedbackSheet.jsx';
-import { ACTIVITY_OPTIONS, GOAL_OPTIONS } from './PWOnboarding.jsx';
+import PWNav from '../ui/PWNav.jsx';
+import PWPlate from '../ui/PWPlate.jsx';
+import PWLeader from '../ui/PWLeader.jsx';
 
-const cmToInches = (cm) => Math.round((cm / 2.54) * 10) / 10;
-const kgToLbs = (kg) => Math.round((kg * 2.20462) * 10) / 10;
-
-const MEAL_TYPES  = ['breakfast', 'lunch', 'snack', 'dinner'];
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', snack: 'Snack', dinner: 'Dinner' };
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function detectMealType() {
-  const h = new Date().getHours();
-  if (h < 10) return 'breakfast';
-  if (h < 15) return 'lunch';
-  if (h < 18) return 'snack';
-  return 'dinner';
-}
-
-function stepperLabel(dateOffset) {
+function dateLabel(dateOffset) {
   const date = new Date();
   date.setDate(date.getDate() + dateOffset);
-  if (dateOffset === 0) {
-    return 'Today, ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  }
-  if (dateOffset === -1) {
-    return 'Yesterday, ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  }
-  return date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMeal, refreshSignal }) {
-  const [dateOffset, setDateOffset]     = useState(0);
-  const [meals, setMeals]               = useState(null);
-  const [savedMeals, setSavedMeals]     = useState([]);
-  const [settings, setSettings]         = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [draftTargets, setDraftTargets] = useState(null);
-  const [showGearMenu, setShowGearMenu] = useState(false);
-  const [showProfile, setShowProfile]   = useState(false);
-  const [profileForm, setProfileForm]   = useState(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState('');
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [busyChip, setBusyChip]         = useState(null);
-  const [error, setError]               = useState(null);
-  const [viewingMeal, setViewingMeal]   = useState(null);
-  const [exportLoading, setExportLoading] = useState(false);
-  const [exportNotice, setExportNotice] = useState(null); // { type: 'error' | 'info', text: string }
-  const [exportRange, setExportRange] = useState('all');
-  const [showExportPicker, setShowExportPicker] = useState(false);
+function weekdayName(dateOffset) {
+  const date = new Date();
+  date.setDate(date.getDate() + dateOffset);
+  return date.toLocaleDateString(undefined, { weekday: 'long' });
+}
+
+const chevBtn = (disabled) => ({
+  width: 44, height: 44, background: 'none', border: 'none', display: 'grid', placeItems: 'center',
+  cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.3 : 1,
+});
+
+const headingStyle = { fontFamily: T.fontDisplay, fontSize: 22, fontWeight: 'normal', margin: 0, color: T.ink };
+
+export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onYou, onEditMeal, refreshSignal }) {
+  const [dateOffset, setDateOffset]   = useState(0);
+  const [meals, setMeals]             = useState(null);
+  const [savedMeals, setSavedMeals]   = useState([]);
+  const [settings, setSettings]       = useState(null);
+  const [busyChip, setBusyChip]       = useState(null);
+  const [error, setError]             = useState(null);
+  const [viewingMeal, setViewingMeal] = useState(null);
 
   const isReadOnly = dateOffset !== 0;
 
@@ -65,7 +52,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
       if (savedRes.ok)    setSavedMeals(await savedRes.json());
       if (settingsRes.ok) setSettings(await settingsRes.json());
     } catch {
-      setError('Could not load dashboard');
+      setError('Could not load Today');
     }
   };
 
@@ -81,6 +68,10 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     };
   }, [meals]);
 
+  const sortedMeals = useMemo(() => (
+    [...(meals || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  ), [meals]);
+
   const quickAddChips = useMemo(() => {
     if (!savedMeals.length) return [];
     const now    = Date.now();
@@ -94,35 +85,11 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     return scored.sort((a, b) => b.score - a.score).slice(0, 6);
   }, [savedMeals]);
 
-  const mealsByType = useMemo(() => {
-    const grouped = { breakfast: [], lunch: [], snack: [], dinner: [] };
-    for (const m of meals || []) {
-      const key = MEAL_TYPES.includes(m.meal_type) ? m.meal_type : 'snack';
-      grouped[key].push(m);
-    }
-    return grouped;
-  }, [meals]);
-
   const onQuickAdd = async (saved) => {
     if (isReadOnly) return;
     setBusyChip(saved.id);
     try {
-      await fetch('/api/saved-meals', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: saved.id, bumpUse: true }),
-      });
-      await fetch('/api/meals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: saved.name, calories: saved.calories,
-          macros:  { carbs: saved.carbs_g, protein: saved.protein_g, fat: saved.fat_g },
-          other:   { fiber: saved.fiber_g, sugar: saved.sugar_g, sodium: saved.sodium_mg },
-          ingredients: saved.ingredients,
-          mealType: detectMealType(),
-        }),
-      });
+      await logSavedMeal(saved);
       await load();
     } catch {
       setError('Could not log that item');
@@ -131,433 +98,197 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
     }
   };
 
-  const saveTargets = async () => {
-    try {
-      const res = await fetch('/api/me/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetCalories: Number(draftTargets.target_calories),
-          targetProteinG: Number(draftTargets.target_protein_g),
-          targetCarbsG:   Number(draftTargets.target_carbs_g),
-          targetFatG:     Number(draftTargets.target_fat_g),
-        }),
-      });
-      if (!res.ok) {
-        const b = await res.json().catch(() => ({}));
-        setError(b.error || 'Could not save targets');
-        return;
-      }
-      const updated = await res.json();
-      setSettings((prev) => ({ ...prev, ...updated }));
-      setShowSettings(false);
-    } catch {
-      setError('Could not save targets');
-    }
-  };
-
-  async function handleExportData(range) {
-    setShowGearMenu(false);
-    setShowExportPicker(false);
-    setExportLoading(true);
-    setExportNotice(null);
-    try {
-      const res = await fetch(`/api/me/export?range=${range}`);
-      if (res.status === 429) {
-        const data = await res.json();
-        setExportNotice({ type: 'error', text: data.message || 'You can only export once per hour. Try again soon.' });
-        return;
-      }
-      if (!res.ok) {
-        setExportNotice({ type: 'error', text: 'Export failed. Please try again.' });
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const rangeLabel = range === 'all' ? 'all' : `last${range}`;
-      a.download = `platewise-export-${rangeLabel}-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setExportNotice({ type: 'error', text: 'Export failed. Please try again.' });
-    } finally {
-      setExportLoading(false);
-    }
-  }
-
-  async function openProfileEditor() {
-    setProfileError('');
-    setProfileLoading(true);
-    setShowProfile(true);
-    try {
-      const r = await fetch('/api/me/profile');
-      const data = await r.json();
-      const unit_pref = data.unit_pref || 'metric';
-      const height = data.height_cm != null
-        ? (unit_pref === 'imperial' ? cmToInches(data.height_cm) : data.height_cm)
-        : '';
-      const weight = data.weight_kg != null
-        ? (unit_pref === 'imperial' ? kgToLbs(data.weight_kg) : data.weight_kg)
-        : '';
-      setProfileForm({
-        name: data.name || '',
-        gender: data.gender || '',
-        age: data.age ?? '',
-        height,
-        weight,
-        unit_pref,
-        activity_level: data.activity_level || '',
-        goal: data.goal || 'maintain',
-      });
-    } catch {
-      setProfileError('Could not load profile');
-    } finally {
-      setProfileLoading(false);
-    }
-  }
-
-  async function saveProfile() {
-    setProfileError('');
-    if (!profileForm.gender || !profileForm.age || !profileForm.height || !profileForm.weight || !profileForm.activity_level) {
-      setProfileError('Please fill in all required fields');
-      return;
-    }
-    setProfileLoading(true);
-    try {
-      const r = await fetch('/api/me/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: profileForm.name || undefined,
-          gender: profileForm.gender,
-          age: profileForm.age,
-          height: profileForm.height,
-          weight: profileForm.weight,
-          unit_pref: profileForm.unit_pref,
-          activity_level: profileForm.activity_level,
-          goal: profileForm.goal,
-        }),
-      });
-      if (!r.ok) {
-        const b = await r.json().catch(() => ({}));
-        setProfileError(b.error || 'Could not save profile');
-        return;
-      }
-      setShowProfile(false);
-      await load();
-    } catch {
-      setProfileError('Could not save profile');
-    } finally {
-      setProfileLoading(false);
-    }
-  }
-
   const targets = settings || { target_calories: 2200, target_protein_g: 180, target_carbs_g: 200, target_fat_g: 70 };
-  const remaining = Math.max(0, targets.target_calories - Math.round(totals.calories));
+  const consumed = Math.round(totals.calories);
+  const targetCal = Number(targets.target_calories) || 0;
+  const remaining = Math.max(0, targetCal - consumed);
+  const over = Math.max(0, consumed - targetCal);
+  const pct = targetCal > 0 ? Math.min(100, (consumed / targetCal) * 100) : 0;
+
+  const nudge = !isReadOnly
+    ? macroNudge(
+        { protein: totals.protein, carbs: totals.carbs, fat: totals.fat },
+        { protein: targets.target_protein_g, carbs: targets.target_carbs_g, fat: targets.target_fat_g },
+      )
+    : null;
+
+  const mealTypeNow = detectMealType();
 
   return (
     <div style={{
-      width: '100%', minHeight: '100%', background: T.bg, fontFamily: T.font,
-      padding: '28px 20px 100px', boxSizing: 'border-box', position: 'relative',
+      width: '100%', minHeight: '100%', background: T.bg, fontFamily: T.fontBody, color: T.ink,
+      padding: '24px 20px 120px', boxSizing: 'border-box', position: 'relative',
     }}>
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-        <div>
-          <div style={{
-            fontFamily: T.heading,
-            fontSize: 24, fontWeight: 700, color: T.ink,
-            letterSpacing: '-0.3px', lineHeight: 1.2,
-          }}>
-            {getGreeting(settings?.name)}
-          </div>
-        </div>
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => { setShowGearMenu((v) => !v); setExportNotice(null); setShowExportPicker(false); }}
-            style={{
-              width: 36, height: 36, borderRadius: 10, background: '#fff',
-              border: `1px solid ${T.line}`, display: 'grid', placeItems: 'center',
-              cursor: 'pointer', boxShadow: T.shadowSoft,
-            }}>
-            {PWIcon2.gear(16)}
-          </button>
-          {showGearMenu && (
-            <>
-              <div onClick={() => setShowGearMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />
-              <div style={{
-                position: 'absolute', top: 42, right: 0, zIndex: 40,
-                background: '#fff', borderRadius: 12, boxShadow: T.shadow,
-                border: `1px solid ${T.line}`, minWidth: 160, overflow: 'hidden',
-              }}>
-                <button
-                  onClick={() => { setShowGearMenu(false); setDraftTargets({ ...targets }); setShowSettings(true); }}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left', padding: '11px 14px',
-                    border: 'none', background: 'none', cursor: 'pointer',
-                    fontFamily: T.font, fontSize: 13.5, color: T.ink,
-                  }}>
-                  Daily Targets
-                </button>
-                <button
-                  onClick={() => { setShowGearMenu(false); openProfileEditor(); }}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left', padding: '11px 14px',
-                    border: `1px solid ${T.line}`, borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
-                    background: 'none', cursor: 'pointer',
-                    fontFamily: T.font, fontSize: 13.5, color: T.ink,
-                  }}>
-                  Edit Profile
-                </button>
-                <button
-                  onClick={() => setShowExportPicker((v) => !v)}
-                  disabled={exportLoading}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left', padding: '11px 14px',
-                    border: `1px solid ${T.line}`, borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
-                    background: 'none', cursor: exportLoading ? 'default' : 'pointer',
-                    fontFamily: T.font, fontSize: 13.5, color: T.ink, opacity: exportLoading ? 0.6 : 1,
-                  }}>
-                  {exportLoading ? 'Exporting…' : 'Export Data'}
-                </button>
-                {showExportPicker && (
-                  <div style={{ borderTop: `1px solid ${T.line}` }}>
-                    {[
-                      { label: 'All', value: 'all' },
-                      { label: 'Last 90 days', value: '90' },
-                      { label: 'Last 30 days', value: '30' },
-                    ].map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => handleExportData(opt.value)}
-                        style={{
-                          display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px 9px 24px',
-                          border: 'none', background: 'none', cursor: 'pointer',
-                          fontFamily: T.font, fontSize: 13, color: T.ink,
-                        }}>
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-          {exportNotice && (
-            <div style={{
-              position: 'absolute', top: 42, right: 0, zIndex: 40,
-              background: T.red50, border: `1px solid ${T.red}`,
-              borderRadius: 10, padding: '9px 12px', minWidth: 220, maxWidth: 280,
-              display: 'flex', alignItems: 'flex-start', gap: 8,
-              boxShadow: T.shadow,
-            }}>
-              <span style={{ fontSize: 12.5, color: T.red, flex: 1 }}>{exportNotice.text}</span>
-              <button onClick={() => setExportNotice(null)} style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                color: T.red, fontSize: 16, lineHeight: 1, flexShrink: 0,
-              }}>×</button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Date Stepper ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 16,
-      }}>
-        <button
-          onClick={() => setDateOffset((o) => o - 1)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-        >
-          {PWIcon2.chevLeft(20, T.green)}
+      {/* Date row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <button onClick={() => setDateOffset((o) => o - 1)} aria-label="Previous day" style={chevBtn(false)}>
+          {PWIcon2.chevLeft(20, T.ink)}
         </button>
-        <span style={{ fontSize: 13.5, fontWeight: 600, color: T.inkSoft }}>
-          {stepperLabel(dateOffset)}
-        </span>
+        <span style={{ fontSize: 15, color: T.inkMute }}>{dateLabel(dateOffset)}</span>
         <button
           onClick={() => setDateOffset((o) => Math.min(0, o + 1))}
           disabled={dateOffset === 0}
-          style={{
-            background: 'none', border: 'none', cursor: dateOffset === 0 ? 'default' : 'pointer',
-            padding: 4, opacity: dateOffset === 0 ? 0.3 : 1,
-            pointerEvents: dateOffset === 0 ? 'none' : 'auto',
-          }}
+          aria-label="Next day"
+          style={chevBtn(dateOffset === 0)}
         >
-          {PWIcon2.chevRight(20, T.green)}
+          {PWIcon2.chevRight(20, T.ink)}
         </button>
       </div>
 
-      {/* ── Read-only banner ── */}
+      {/* Greeting */}
+      <h1 style={{ fontFamily: T.fontDisplay, fontSize: 34, fontWeight: 'normal', margin: '0 0 16px', lineHeight: 1.15 }}>
+        {isReadOnly ? weekdayName(dateOffset) : getGreeting(settings?.name)}
+      </h1>
+
       {isReadOnly && (
         <div style={{
-          background: T.amber50, border: `1px solid ${T.amber}`, borderRadius: 12,
-          padding: '10px 14px', marginBottom: 16,
+          background: T.tint, borderRadius: T.rPill, padding: '6px 6px 6px 16px', marginBottom: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
         }}>
-          <span style={{ fontSize: 12.5, color: T.amber, fontWeight: 500 }}>
-            📅 Viewing a past day, read only
-          </span>
-          <button
-            onClick={() => setDateOffset(0)}
-            style={{
-              background: T.amber, color: '#fff', border: 'none', borderRadius: 8,
-              padding: '5px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-              fontFamily: T.font, whiteSpace: 'nowrap',
-            }}
-          >
-            Back to today
-          </button>
+          <span style={{ fontSize: 14, color: T.inkSoft }}>Viewing a past day. Quick add is off.</span>
+          <button onClick={() => setDateOffset(0)} style={{
+            background: T.ink, color: T.onAccent, border: 'none', borderRadius: T.rPill, minHeight: 44,
+            padding: '0 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: T.fontBody, whiteSpace: 'nowrap',
+          }}>Back to today</button>
         </div>
       )}
 
       {error && (
-        <div style={{ color: T.red, fontSize: 12.5, marginBottom: 10 }}>{error}</div>
+        <div style={{ color: T.danger, background: T.dangerTint, borderRadius: 12, padding: '10px 14px', fontSize: 14, marginBottom: 12 }}>{error}</div>
       )}
 
-      {/* ── Calorie Ring ── */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-        <PWRing
-          value={totals.calories}
-          target={targets.target_calories}
-          size={160} stroke={13} color={T.green}
-          label={
-            <span style={{
-              fontFamily: T.heading,
-              fontSize: 30, fontWeight: 700, color: T.ink, letterSpacing: '-0.5px',
-            }}>
-              {Math.round(totals.calories).toLocaleString()}
+      {/* Menu panel */}
+      <section style={{ background: T.tint, borderRadius: T.rPanel, padding: 22, marginBottom: 14 }}>
+        {over > 0 ? (
+          <div style={{ fontSize: 16, color: T.inkSoft }}>
+            <span style={{ fontFamily: T.fontDisplay, fontSize: 66, lineHeight: 1, color: T.goldInk, fontVariantNumeric: 'tabular-nums' }}>
+              {over.toLocaleString()}
             </span>
-          }
-          sub={
-            <span style={{ fontSize: 11, color: T.inkMute }}>
-              {remaining > 0 ? `${remaining} kcal left` : 'Goal reached'}
-            </span>
-          }
-        />
-      </div>
-
-      {/* ── Macro Pills ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 22 }}>
-        {[
-          { label: 'Protein', value: totals.protein,  target: targets.target_protein_g },
-          { label: 'Carbs',   value: totals.carbs,    target: targets.target_carbs_g },
-          { label: 'Fat',     value: totals.fat,      target: targets.target_fat_g },
-        ].map(({ label, value, target: tgt }) => (
-          <div key={label} style={{
-            flex: 1, background: T.lineSoft, borderRadius: 12, padding: '10px 12px', textAlign: 'center',
-          }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: T.ink }}>{Math.round(value)}g</div>
-            <div style={{ fontSize: 9.5, color: T.inkMute, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {label}
-            </div>
-            <div style={{
-              height: 3, background: T.line, borderRadius: 2, marginTop: 6, overflow: 'hidden',
-            }}>
-              <div style={{
-                width: `${Math.min(100, tgt > 0 ? (value / tgt) * 100 : 0)}%`,
-                height: '100%', background: T.green, borderRadius: 2,
-                transition: 'width 0.4s ease',
-              }} />
-            </div>
+            <div style={{ marginTop: 6 }}>kcal over, target {targetCal.toLocaleString()}</div>
           </div>
-        ))}
+        ) : remaining === 0 && consumed > 0 ? (
+          <div>
+            <span style={{ fontFamily: T.fontDisplay, fontSize: 44, lineHeight: 1.1 }}>Goal reached</span>
+            <div style={{ fontSize: 16, color: T.inkSoft, marginTop: 6 }}>{consumed.toLocaleString()} of {targetCal.toLocaleString()} kcal</div>
+          </div>
+        ) : (
+          <div>
+            <span style={{ fontFamily: T.fontDisplay, fontSize: 66, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+              {remaining.toLocaleString()}
+            </span>
+            <div style={{ fontSize: 16, color: T.inkSoft, marginTop: 6 }}>kcal left of {targetCal.toLocaleString()}</div>
+          </div>
+        )}
+        <div
+          role="progressbar" aria-label="Calories eaten" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}
+          style={{ height: 6, borderRadius: 3, background: 'rgba(23,54,42,0.1)', margin: '16px 0 10px', overflow: 'hidden' }}
+        >
+          <div style={{
+            width: `${pct}%`, height: '100%', borderRadius: 3,
+            background: over > 0 ? T.gold : T.ink, transition: 'width 0.4s ease',
+          }} />
+        </div>
+        <PWLeader label="Protein" value={`${Math.round(totals.protein)} of ${Math.round(targets.target_protein_g)}`} unit="g" />
+        <PWLeader label="Carbs" value={`${Math.round(totals.carbs)} of ${Math.round(targets.target_carbs_g)}`} unit="g" />
+        <PWLeader label="Fat" value={`${Math.round(totals.fat)} of ${Math.round(targets.target_fat_g)}`} unit="g" />
+      </section>
+
+      {/* Nudge */}
+      {nudge && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, fontSize: 15, color: T.inkSoft }}>
+          <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: '50%', background: T.sage, flexShrink: 0 }} />
+          <span>{cap(nudge.macro)} is behind pace. {nudge.gramsToGo} g to go today.</span>
+        </div>
+      )}
+
+      {/* Plates */}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '22px 0 12px' }}>
+        <h2 style={headingStyle}>{isReadOnly ? 'Plates' : "Today's plates"}</h2>
+        <span style={{ fontSize: 15, color: T.inkMute }}>{consumed.toLocaleString()} kcal</span>
       </div>
 
-      {/* ── Quick Add (hidden in read-only mode) ── */}
+      {meals === null ? (
+        <div style={{ color: T.inkMute, fontSize: 15, padding: '24px 0' }}>Loading…</div>
+      ) : (
+        <>
+          <div className="pw-hscroll" style={{
+            display: 'flex', gap: 18, overflowX: 'auto', scrollSnapType: 'x mandatory',
+            padding: '4px 20px 22px', margin: '0 -20px',
+          }}>
+            {sortedMeals.map((m) => (
+              <button key={m.id} onClick={() => setViewingMeal(m)} style={{
+                flex: '0 0 138px', width: 138, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                scrollSnapAlign: 'start', textAlign: 'center', fontFamily: T.fontBody, color: T.ink,
+              }}>
+                <PWPlate src={m.photo_url} name={m.name} size={138} />
+                <div style={{
+                  fontFamily: T.fontDisplay, fontSize: 17, marginTop: 12, lineHeight: 1.25,
+                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                }}>{m.name}</div>
+                <div style={{ fontSize: 14, color: T.inkMute, marginTop: 3 }}>
+                  {MEAL_LABELS[m.meal_type] || 'Meal'}, {Math.round(m.calories)} kcal
+                </div>
+              </button>
+            ))}
+            {!isReadOnly && (
+              <button onClick={onAddMeal} aria-label={`Log ${MEAL_LABELS[mealTypeNow]}`} style={{
+                flex: '0 0 138px', width: 138, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                scrollSnapAlign: 'start', textAlign: 'center', fontFamily: T.fontBody, color: T.ink,
+              }}>
+                <span style={{
+                  width: 138, height: 138, borderRadius: '50%', border: `2px dashed ${T.lineStrong}`,
+                  display: 'grid', placeItems: 'center', boxSizing: 'border-box',
+                }}>
+                  {PWIcon2.plus(30, T.sage)}
+                </span>
+                <div style={{ fontFamily: T.fontDisplay, fontSize: 17, marginTop: 12 }}>{MEAL_LABELS[mealTypeNow]}</div>
+                <div style={{ fontSize: 14, color: T.inkMute, marginTop: 3 }}>Not logged</div>
+              </button>
+            )}
+          </div>
+          {sortedMeals.length === 0 && (
+            <div style={{ fontSize: 15, color: T.inkMute, marginTop: -8, marginBottom: 14 }}>
+              {isReadOnly ? 'No meals logged on this day.' : 'Nothing logged yet today.'}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Log again */}
       {!isReadOnly && quickAddChips.length > 0 && (
-        <div style={{ marginBottom: 22 }}>
-          <div style={sectionLabelStyle}>Quick Add</div>
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+        <div style={{ marginTop: 6 }}>
+          <h2 style={{ ...headingStyle, marginBottom: 12 }}>Log again</h2>
+          <div className="pw-hscroll" style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '2px 20px 6px', margin: '0 -20px' }}>
             {quickAddChips.map((c) => (
               <button key={c.id} onClick={() => onQuickAdd(c)} disabled={busyChip === c.id} style={{
-                flex: '0 0 auto', minWidth: 80,
-                background: '#fff', border: `1px solid ${T.line}`, borderRadius: 12,
-                padding: '10px 12px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 4, cursor: 'pointer', fontFamily: T.font,
-                boxShadow: T.shadowSoft, opacity: busyChip === c.id ? 0.5 : 1,
+                flex: '0 0 auto', minHeight: 48, display: 'flex', alignItems: 'center', gap: 10,
+                padding: '6px 16px 6px 8px', background: '#fff', border: `1.5px solid ${T.line}`, borderRadius: T.rPill,
+                cursor: busyChip === c.id ? 'default' : 'pointer', fontFamily: T.fontBody, color: T.ink,
+                opacity: busyChip === c.id ? 0.7 : 1,
               }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: T.ink, whiteSpace: 'nowrap', maxWidth: 88, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {busyChip === c.id ? '✓ Added' : c.name}
+                {busyChip === c.id ? (
+                  <span aria-hidden="true" style={{
+                    width: 32, height: 32, display: 'grid', placeItems: 'center',
+                  }}>
+                    <span style={{
+                      width: 18, height: 18, borderRadius: '50%', border: `2.5px solid ${T.ink}`, borderTopColor: 'transparent',
+                      animation: 'pw-spin 0.8s linear infinite',
+                    }} />
+                  </span>
+                ) : (
+                  <PWPlate src={c.photo_url} name={c.name} size={32} rim={false} />
+                )}
+                <span style={{ fontSize: 15, fontWeight: 500, whiteSpace: 'nowrap', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {c.name}
                 </span>
-                <span style={{ fontSize: 10.5, color: T.green, fontWeight: 700 }}>{Math.round(c.calories)} cal</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── Meal Sections ── */}
-      {meals === null && (
-        <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, marginTop: 30 }}>Loading…</div>
-      )}
-      {meals && meals.length === 0 && (
-        <div style={{
-          background: '#fff', border: `1px solid ${T.lineSoft}`, borderRadius: 16,
-          padding: '24px 20px', textAlign: 'center', color: T.inkMute, fontSize: 13,
-        }}>
-          {isReadOnly ? 'No meals logged on this day.' : 'Nothing logged yet today — tap + to add your first meal.'}
-        </div>
-      )}
-      {meals && meals.length > 0 && (
-        <div style={{ background: '#fff', borderRadius: 16, border: `1px solid ${T.line}`, overflow: 'hidden', boxShadow: T.shadowSoft }}>
-          {MEAL_TYPES.map((type, idx) => {
-            const entries = mealsByType[type];
-            return (
-              <div key={type} style={{
-                borderBottom: idx < MEAL_TYPES.length - 1 ? `1px solid ${T.lineSoft}` : 'none',
-              }}>
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '12px 16px',
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: T.inkMute, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-                    {MEAL_LABELS[type]}
-                  </div>
-                  {!isReadOnly && (
-                    <button onClick={onAddMeal} style={{
-                      width: 22, height: 22, background: entries.length ? T.green : T.lineSoft,
-                      borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', cursor: 'pointer',
-                    }}>
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M5 2v6M2 5h6" stroke={entries.length ? '#fff' : T.inkFaint} strokeWidth="1.6" strokeLinecap="round"/>
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {entries.length > 0 ? entries.map((m) => (
-                  <button key={m.id} onClick={() => setViewingMeal(m)} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: 'none', border: 'none', padding: '8px 16px 10px',
-                    cursor: 'pointer', fontFamily: T.font,
-                    textAlign: 'left', width: '100%',
-                  }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-                      <span style={{ fontSize: 15, flexShrink: 0 }}>{getFoodEmoji(m.name)}</span>
-                      <span style={{
-                        fontSize: 13.5, fontWeight: 500, color: T.ink,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>{m.name}</span>
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: T.green, flexShrink: 0, marginLeft: 8 }}>
-                      {Math.round(m.calories)}
-                    </span>
-                  </button>
-                )) : (
-                  <div style={{ fontSize: 12.5, color: T.inkFaint, padding: '0 16px 12px' }}>Nothing logged yet</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Meal detail view ── */}
+      {/* Meal detail view */}
       <PWMealView
         meal={viewingMeal}
         onClose={() => setViewingMeal(null)}
@@ -565,240 +296,7 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onEditMea
         origin="dashboard"
       />
 
-      {/* ── Send feedback ── */}
-      <button
-        onClick={() => setShowFeedback(true)}
-        style={{
-          display: 'block', margin: '24px auto 0', padding: '10px 16px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontFamily: T.font, fontSize: 13, color: T.inkMute, textDecoration: 'underline',
-        }}>
-        Send feedback
-      </button>
-
-      {/* ── Bottom Nav ── */}
-      <BottomNav
-        active="home"
-        onHome={undefined}
-        onAdd={onAddMeal}
-        onHistory={onHistory}
-        onLibrary={onLibrary}
-      />
-
-      {/* ── Edit Profile Modal ── */}
-      {showProfile && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(39,26,15,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 50, padding: 20, overflowY: 'auto',
-        }} onClick={() => setShowProfile(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            background: '#fff', borderRadius: 20, padding: 24,
-            width: '100%', maxWidth: 360, boxShadow: T.shadow,
-            display: 'flex', flexDirection: 'column', gap: 14,
-            margin: 'auto',
-          }}>
-            <div style={{ fontFamily: T.heading, fontSize: 18, fontWeight: 700, color: T.ink }}>Edit Profile</div>
-
-            {profileLoading && !profileForm ? (
-              <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, padding: '20px 0' }}>Loading…</div>
-            ) : profileForm && (
-              <>
-                {/* Name */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <label style={profileLabelStyle}>Name <span style={{ fontWeight: 400, color: T.inkFaint }}>(optional)</span></label>
-                  <input
-                    type="text"
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
-                    style={profileInputStyle(T)}
-                  />
-                </div>
-
-                {/* Gender */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <label style={profileLabelStyle}>Gender</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {['male', 'female'].map((g) => (
-                      <button key={g} onClick={() => setProfileForm((f) => ({ ...f, gender: g }))} style={{
-                        flex: 1, padding: '9px 0', borderRadius: 10, cursor: 'pointer', fontFamily: T.font,
-                        fontSize: 13, fontWeight: profileForm.gender === g ? 600 : 400,
-                        background: profileForm.gender === g ? T.greenSoft : T.bg,
-                        border: `1.5px solid ${profileForm.gender === g ? T.green : T.line}`,
-                        color: profileForm.gender === g ? T.green : T.ink,
-                      }}>
-                        {g.charAt(0).toUpperCase() + g.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Age */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <label style={profileLabelStyle}>Age</label>
-                  <input
-                    type="number"
-                    min="10" max="120"
-                    value={profileForm.age}
-                    onChange={(e) => setProfileForm((f) => ({ ...f, age: e.target.value }))}
-                    style={profileInputStyle(T)}
-                  />
-                </div>
-
-                {/* Height */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <label style={profileLabelStyle}>Height ({profileForm.unit_pref === 'imperial' ? 'in' : 'cm'})</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={profileForm.height}
-                    onChange={(e) => setProfileForm((f) => ({ ...f, height: e.target.value }))}
-                    style={profileInputStyle(T)}
-                  />
-                </div>
-
-                {/* Weight */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <label style={profileLabelStyle}>Weight ({profileForm.unit_pref === 'imperial' ? 'lbs' : 'kg'})</label>
-                  <input
-                    type="number"
-                    min="0" step="0.1"
-                    value={profileForm.weight}
-                    onChange={(e) => setProfileForm((f) => ({ ...f, weight: e.target.value }))}
-                    style={profileInputStyle(T)}
-                  />
-                </div>
-
-                {/* Activity level */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <label style={profileLabelStyle}>Activity level</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {ACTIVITY_OPTIONS.map((o) => (
-                      <button key={o.value} onClick={() => setProfileForm((f) => ({ ...f, activity_level: o.value }))} style={{
-                        background: profileForm.activity_level === o.value ? T.greenSoft : T.bg,
-                        border: `1.5px solid ${profileForm.activity_level === o.value ? T.green : T.line}`,
-                        borderRadius: 10, padding: '10px 12px',
-                        cursor: 'pointer', textAlign: 'left', fontFamily: T.font,
-                      }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: profileForm.activity_level === o.value ? T.green : T.ink }}>{o.label}</div>
-                        <div style={{ fontSize: 12, color: T.inkMute, marginTop: 2 }}>{o.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Goal */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <label style={profileLabelStyle}>Goal</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {GOAL_OPTIONS.map((o) => (
-                      <button key={o.value} onClick={() => setProfileForm((f) => ({ ...f, goal: o.value }))} style={{
-                        background: profileForm.goal === o.value ? T.greenSoft : T.bg,
-                        border: `1.5px solid ${profileForm.goal === o.value ? T.green : T.line}`,
-                        borderRadius: 10, padding: '11px 14px',
-                        cursor: 'pointer', textAlign: 'left', fontFamily: T.font,
-                        display: 'flex', alignItems: 'center', gap: 10,
-                      }}>
-                        <span style={{ fontSize: 20 }}>{o.icon}</span>
-                        <span style={{ fontSize: 13.5, fontWeight: 600, color: profileForm.goal === o.value ? T.green : T.ink }}>{o.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {profileError && (
-                  <div style={{ color: T.red, fontSize: 13, background: T.red50, border: `1px solid ${T.red}`, borderRadius: 8, padding: '9px 12px' }}>
-                    {profileError}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                  <button onClick={() => setShowProfile(false)} style={{
-                    flex: 1, padding: '11px', borderRadius: 12, border: `1px solid ${T.line}`,
-                    background: '#fff', cursor: 'pointer', fontFamily: T.font, fontSize: 14, color: T.inkSoft,
-                  }}>Cancel</button>
-                  <button onClick={saveProfile} disabled={profileLoading} style={{
-                    flex: 1, padding: '11px', borderRadius: 12, border: 'none',
-                    background: T.green, color: '#fff', fontWeight: 700,
-                    cursor: profileLoading ? 'default' : 'pointer', fontFamily: T.font, fontSize: 14,
-                    opacity: profileLoading ? 0.7 : 1,
-                  }}>Save</button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Settings Popover ── */}
-      {showSettings && draftTargets && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(39,26,15,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 50, padding: 20,
-        }} onClick={() => setShowSettings(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            background: '#fff', borderRadius: 20, padding: 24,
-            width: '100%', maxWidth: 320, boxShadow: T.shadow,
-            display: 'flex', flexDirection: 'column', gap: 14,
-          }}>
-            <div style={{ fontFamily: T.heading, fontSize: 18, fontWeight: 700, color: T.ink }}>Daily Targets</div>
-            {[
-              ['target_calories', 'Calories (kcal)', 800],
-              ['target_protein_g', 'Protein (g)', 20],
-              ['target_carbs_g', 'Carbs (g)', 20],
-              ['target_fat_g', 'Fat (g)', 10],
-            ].map(([key, label, minVal]) => (
-              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <label style={{ fontSize: 11, color: T.inkMute, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</label>
-                <input
-                  type="number"
-                  min={minVal}
-                  value={draftTargets[key]}
-                  onChange={(e) => setDraftTargets((d) => ({ ...d, [key]: e.target.value }))}
-                  style={{
-                    border: `1.5px solid ${T.line}`, borderRadius: 10,
-                    padding: '10px 12px', fontSize: 15, fontFamily: T.font,
-                    color: T.ink, outline: 'none',
-                  }}
-                />
-              </div>
-            ))}
-            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setShowSettings(false)} style={{
-                flex: 1, padding: '11px', borderRadius: 12, border: `1px solid ${T.line}`,
-                background: '#fff', cursor: 'pointer', fontFamily: T.font, fontSize: 14, color: T.inkSoft,
-              }}>Cancel</button>
-              <button onClick={saveTargets} style={{
-                flex: 1, padding: '11px', borderRadius: 12, border: 'none',
-                background: T.green, color: '#fff', fontWeight: 700,
-                cursor: 'pointer', fontFamily: T.font, fontSize: 14,
-              }}>Save</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showFeedback && (
-        <PWFeedbackSheet onClose={() => setShowFeedback(false)} />
-      )}
+      <PWNav active="today" onToday={() => {}} onHistory={onHistory} onScan={onAddMeal} onLibrary={onLibrary} onYou={onYou} />
     </div>
   );
-}
-
-const sectionLabelStyle = {
-  fontSize: 10.5, fontWeight: 700, color: T.inkMute,
-  letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 10,
-};
-
-const profileLabelStyle = {
-  fontSize: 11, color: T.inkMute, fontWeight: 600,
-  textTransform: 'uppercase', letterSpacing: '0.06em',
-};
-
-function profileInputStyle(T) {
-  return {
-    border: `1.5px solid ${T.line}`, borderRadius: 10,
-    padding: '10px 12px', fontSize: 15, fontFamily: T.font,
-    color: T.ink, outline: 'none',
-  };
 }

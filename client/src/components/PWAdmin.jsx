@@ -11,13 +11,13 @@ function StatCard({ label, value, sub }) {
       background: '#fff', borderRadius: 14, padding: '18px 20px',
       border: `1px solid ${T.line}`, boxShadow: T.shadowSoft,
     }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: T.inkMute, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: T.inkMute, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
         {label}
       </div>
-      <div style={{ fontSize: 26, fontWeight: 700, color: T.ink, fontFamily: T.heading, letterSpacing: '-0.5px' }}>
+      <div style={{ fontSize: 26, color: T.ink, fontFamily: T.fontDisplay, letterSpacing: '-0.5px' }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 12, color: T.inkMute, marginTop: 3 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 13, color: T.inkMute, marginTop: 3 }}>{sub}</div>}
     </div>
   );
 }
@@ -111,24 +111,24 @@ export default function PWAdmin() {
   }
 
   const fmtInr = (v) => `₹${Number(v ?? 0).toFixed(2)}`;
-  const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) : '—';
+  const fmtDate = (s) => s ? new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) : '-';
 
   const sectionHead = (title) => (
-    <div style={{ fontFamily: T.heading, fontSize: 18, fontWeight: 700, color: T.ink, marginBottom: 14, marginTop: 28, letterSpacing: '-0.3px' }}>
+    <div style={{ fontFamily: T.fontDisplay, fontSize: 18, color: T.ink, marginBottom: 14, marginTop: 28, letterSpacing: '-0.3px' }}>
       {title}
     </div>
   );
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.font, color: T.inkMute }}>
+      <div style={{ minHeight: '100vh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: T.fontBody, color: T.inkMute }}>
         Loading…
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: T.bg, fontFamily: T.font, padding: '0 0 60px' }}>
+    <div style={{ minHeight: '100vh', background: T.bg, fontFamily: T.fontBody, padding: '0 0 60px' }}>
       {/* Header */}
       <div style={{
         background: '#fff', borderBottom: `1px solid ${T.line}`,
@@ -136,12 +136,12 @@ export default function PWAdmin() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         position: 'sticky', top: 0, zIndex: 10,
       }}>
-        <div style={{ fontFamily: T.heading, fontWeight: 700, fontSize: 18, color: T.ink, letterSpacing: '-0.3px' }}>
+        <div style={{ fontFamily: T.fontDisplay, fontSize: 18, color: T.ink, letterSpacing: '-0.3px' }}>
           Platewise Admin
         </div>
         <button onClick={() => navigate('/app')} style={{
           background: 'none', border: `1px solid ${T.line}`, borderRadius: 8,
-          padding: '5px 12px', fontSize: 12.5, color: T.inkMute, cursor: 'pointer', fontFamily: T.font,
+          padding: '5px 12px', fontSize: 13, color: T.inkMute, cursor: 'pointer', fontFamily: T.fontBody,
         }}>
           Go to app
         </button>
@@ -161,13 +161,13 @@ export default function PWAdmin() {
         <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.line}`, padding: '16px 8px', boxShadow: T.shadowSoft }}>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={trend} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: T.inkFaint }} />
-              <YAxis tick={{ fontSize: 10, fill: T.inkFaint }} allowDecimals={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 13, fill: T.inkMute }} />
+              <YAxis tick={{ fontSize: 13, fill: T.inkMute }} allowDecimals={false} />
               <Tooltip
-                contentStyle={{ fontFamily: T.font, fontSize: 12, borderRadius: 8, border: `1px solid ${T.line}` }}
+                contentStyle={{ fontFamily: T.fontBody, fontSize: 13, borderRadius: 8, border: `1px solid ${T.line}` }}
                 formatter={(v) => [v, 'Scans']}
               />
-              <Bar dataKey="scans" fill={T.green} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="scans" fill={T.ink} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -176,7 +176,7 @@ export default function PWAdmin() {
         {sectionHead('Users')}
         <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.line}`, overflow: 'hidden', boxShadow: T.shadowSoft }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, fontFamily: T.font }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: T.fontBody }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${T.line}` }}>
                   {['Email', 'Scans (30d)', 'Cost (30d)', 'Cost (lifetime)', 'Target', 'Joined', 'Last active', '+ Scans'].map((h) => (
@@ -189,20 +189,20 @@ export default function PWAdmin() {
                   const limit = 99 + (u.bonus_scans ?? 0);
                   const pct = Math.min((u.scans_30d / limit) * 100, 100);
                   return (
-                    <tr key={u.id} style={{ borderBottom: `1px solid ${T.lineSoft}` }}>
+                    <tr key={u.id} style={{ borderBottom: `1px solid ${T.line}` }}>
                       <td style={{ padding: '10px 14px', color: T.ink }}>
-                        <div>{u.name || '—'}</div>
-                        <div style={{ color: T.inkMute, fontSize: 11 }}>{u.email}</div>
+                        <div>{u.name || '-'}</div>
+                        <div style={{ color: T.inkMute, fontSize: 13 }}>{u.email}</div>
                       </td>
                       <td style={{ padding: '10px 14px' }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{u.scans_30d} / {limit}</div>
-                        <div style={{ marginTop: 4, height: 4, background: T.lineSoft, borderRadius: 2, width: 80 }}>
-                          <div style={{ height: '100%', width: `${pct}%`, background: pct > 80 ? T.red : T.green, borderRadius: 2 }} />
+                        <div style={{ marginTop: 4, height: 4, background: T.tint, borderRadius: 2, width: 80 }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: pct > 80 ? T.danger : T.ink, borderRadius: 2 }} />
                         </div>
                       </td>
                       <td style={{ padding: '10px 14px', color: T.ink }}>{fmtInr(u.cost_inr_30d)}</td>
                       <td style={{ padding: '10px 14px', color: T.ink }}>{fmtInr(u.cost_inr_lifetime)}</td>
-                      <td style={{ padding: '10px 14px', color: T.ink }}>{u.calorie_target ? `${u.calorie_target} kcal` : '—'}</td>
+                      <td style={{ padding: '10px 14px', color: T.ink }}>{u.calorie_target ? `${u.calorie_target} kcal` : '-'}</td>
                       <td style={{ padding: '10px 14px', color: T.inkMute, whiteSpace: 'nowrap' }}>{fmtDate(u.created_at)}</td>
                       <td style={{ padding: '10px 14px', color: T.inkMute, whiteSpace: 'nowrap' }}>{fmtDate(u.last_active_at)}</td>
                       <td style={{ padding: '10px 14px' }}>
@@ -213,14 +213,14 @@ export default function PWAdmin() {
                             placeholder="n"
                             value={grantMap[u.id] ?? ''}
                             onChange={(e) => setGrantMap((m) => ({ ...m, [u.id]: e.target.value }))}
-                            style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: `1px solid ${T.line}`, fontSize: 12, fontFamily: T.font, color: T.ink }}
+                            style={{ width: 48, padding: '4px 6px', borderRadius: 6, border: `1px solid ${T.line}`, fontSize: 13, fontFamily: T.fontBody, color: T.ink }}
                           />
                           <button
                             onClick={() => handleGrantScans(u.id)}
                             style={{
-                              background: T.green, color: '#fff', border: 'none',
-                              borderRadius: 6, padding: '4px 10px', fontSize: 12,
-                              cursor: 'pointer', fontFamily: T.font, fontWeight: 600,
+                              background: T.ink, color: '#fff', border: 'none',
+                              borderRadius: 6, padding: '4px 10px', fontSize: 13,
+                              cursor: 'pointer', fontFamily: T.fontBody, fontWeight: 600,
                             }}
                           >
                             Grant
@@ -249,14 +249,14 @@ export default function PWAdmin() {
               }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: T.ink }}>{w.email}</div>
-                  <div style={{ fontSize: 11, color: T.inkMute, marginTop: 2 }}>{fmtDate(w.created_at)}</div>
+                  <div style={{ fontSize: 13, color: T.inkMute, marginTop: 2 }}>{fmtDate(w.created_at)}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     onClick={() => handleWaitlistAction(w.id, 'approve')}
                     style={{
                       background: T.sage, color: '#fff', border: 'none', borderRadius: 8,
-                      padding: '6px 14px', fontSize: 12.5, cursor: 'pointer', fontFamily: T.font, fontWeight: 600,
+                      padding: '6px 14px', fontSize: 13, cursor: 'pointer', fontFamily: T.fontBody, fontWeight: 600,
                     }}
                   >
                     Approve
@@ -264,8 +264,8 @@ export default function PWAdmin() {
                   <button
                     onClick={() => handleWaitlistAction(w.id, 'reject')}
                     style={{
-                      background: T.red50, color: T.red, border: `1px solid ${T.red}`, borderRadius: 8,
-                      padding: '6px 14px', fontSize: 12.5, cursor: 'pointer', fontFamily: T.font, fontWeight: 600,
+                      background: T.dangerTint, color: T.danger, border: `1px solid ${T.danger}`, borderRadius: 8,
+                      padding: '6px 14px', fontSize: 13, cursor: 'pointer', fontFamily: T.fontBody, fontWeight: 600,
                     }}
                   >
                     Reject
@@ -287,17 +287,17 @@ export default function PWAdmin() {
             required
             style={{
               flex: 1, maxWidth: 320, padding: '9px 12px', borderRadius: 9,
-              border: `1.5px solid ${T.line}`, fontSize: 13.5, fontFamily: T.font, color: T.ink, background: T.bg,
+              border: `1.5px solid ${T.line}`, fontSize: 13.5, fontFamily: T.fontBody, color: T.ink, background: T.bg,
             }}
           />
           <button type="submit" style={{
-            background: T.green, color: '#fff', border: 'none', borderRadius: 9,
-            padding: '9px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: T.font,
+            background: T.ink, color: '#fff', border: 'none', borderRadius: 9,
+            padding: '9px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: T.fontBody,
           }}>
             Send invite
           </button>
           {addMsg && (
-            <span style={{ fontSize: 13, color: addMsg === 'Invite sent!' ? T.sage : T.red }}>{addMsg}</span>
+            <span style={{ fontSize: 13, color: addMsg === 'Invite sent!' ? T.sageInk : T.danger }}>{addMsg}</span>
           )}
         </form>
 
@@ -314,18 +314,18 @@ export default function PWAdmin() {
               }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
                   <span style={{
-                    background: f.type === 'scan' ? T.amber50 : T.blue50,
-                    color: f.type === 'scan' ? T.amber : T.blue,
-                    border: `1px solid ${f.type === 'scan' ? T.amber : T.blue}`,
-                    borderRadius: 6, padding: '1px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                    background: f.type === 'scan' ? T.goldTint : T.tint,
+                    color: f.type === 'scan' ? T.goldInk : T.inkSoft,
+                    border: `1px solid ${f.type === 'scan' ? T.gold : T.inkSoft}`,
+                    borderRadius: 6, padding: '1px 8px', fontSize: 13, fontWeight: 700, textTransform: 'uppercase',
                   }}>
                     {f.type === 'scan' ? 'SCAN' : 'APP'}
                   </span>
-                  <span style={{ fontSize: 12, color: T.inkMute }}>
+                  <span style={{ fontSize: 13, color: T.inkMute }}>
                     {f.name || f.email} · {fmtDate(f.created_at)}
                   </span>
                   {f.meal_name && (
-                    <span style={{ fontSize: 12, color: T.inkSoft }}>· {f.meal_name}</span>
+                    <span style={{ fontSize: 13, color: T.inkSoft }}>· {f.meal_name}</span>
                   )}
                 </div>
                 <div style={{ fontSize: 13.5, color: T.ink, lineHeight: 1.5 }}>{f.message}</div>

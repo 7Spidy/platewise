@@ -1,15 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { T } from '../tokens.jsx';
+import PWButton from '../ui/PWButton.jsx';
+import PWPills from '../ui/PWPills.jsx';
+import PWLeader from '../ui/PWLeader.jsx';
 
 const STEPS = ['name', 'gender', 'age', 'height', 'weight', 'activity', 'goal'];
-const STEP_LABELS = ['Your name', 'Gender', 'Age', 'Height', 'Weight', 'Activity level', 'Goal'];
+const STEP_TITLES = ['What should we call you?', 'Your gender', 'Your age', 'Your height', 'Your weight', 'How active are you?', 'What is your goal?'];
+const STEP_HELP = [
+  'This is optional. We use it for your greeting.',
+  'Used to estimate how much energy your body needs.',
+  'Used to estimate how much energy your body needs.',
+  'Pick your units, then enter your height.',
+  'Pick your units, then enter your weight.',
+  'Choose what best matches a typical week.',
+  'We will set your calorie and macro targets to match.',
+];
 
 export const ACTIVITY_OPTIONS = [
   { value: 'sedentary',  label: 'Sedentary',  desc: 'Little or no exercise' },
-  { value: 'light',     label: 'Light',      desc: '1–3 days/week' },
-  { value: 'moderate',  label: 'Moderate',   desc: '3–5 days/week' },
-  { value: 'very',      label: 'Very active', desc: '6–7 days/week' },
+  { value: 'light',     label: 'Light',      desc: '1 to 3 days a week' },
+  { value: 'moderate',  label: 'Moderate',   desc: '3 to 5 days a week' },
+  { value: 'very',      label: 'Very active', desc: '6 to 7 days a week' },
 ];
 
 export const GOAL_OPTIONS = [
@@ -82,84 +94,68 @@ export default function PWOnboarding({ onComplete }) {
   // Show result screen after successful submission
   if (target) {
     return (
-      <div style={{
-        minHeight: '100vh', background: T.bg, fontFamily: T.font,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-      }}>
-        <div style={{
-          background: '#fff', borderRadius: 20, padding: '32px 28px',
-          width: '100%', maxWidth: 380, boxShadow: T.shadow, textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🎯</div>
-          <div style={{ fontFamily: T.heading, fontSize: 22, fontWeight: 700, color: T.ink, marginBottom: 6 }}>
-            Your daily targets
-          </div>
-          <div style={{ fontSize: 13, color: T.inkMute, marginBottom: 24 }}>
-            Based on your stats. You can adjust these anytime in Settings.
-          </div>
+      <div style={{ minHeight: '100vh', background: T.bg, fontFamily: T.fontBody, color: T.ink, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, maxWidth: 440, width: '100%', margin: '0 auto', padding: '48px 20px 24px', boxSizing: 'border-box' }}>
+          <h1 style={{ fontFamily: T.fontDisplay, fontSize: 34, fontWeight: 'normal', margin: 0, lineHeight: 1.15 }}>Your daily targets</h1>
+          <p style={{ fontSize: 16, color: T.inkSoft, lineHeight: 1.5, margin: '8px 0 22px' }}>
+            Based on your stats. You can adjust these anytime on the You screen.
+          </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
-            <StatRow label="Calories" value={`${target.calories} kcal`} color={T.green} />
-            <StatRow label="Carbs" value={`${target.carbs_g}g`} color={T.carbs} />
-            <StatRow label="Protein" value={`${target.protein_g}g`} color={T.protein} />
-            <StatRow label="Fat" value={`${target.fat_g}g`} color={T.fat} />
-          </div>
+          <section style={{ background: T.tint, borderRadius: T.rPanel, padding: '16px 22px' }}>
+            <PWLeader label="Calories" value={target.calories} unit="kcal" />
+            <PWLeader label="Carbs" value={target.carbs_g} unit="g" />
+            <PWLeader label="Protein" value={target.protein_g} unit="g" />
+            <PWLeader label="Fat" value={target.fat_g} unit="g" />
+          </section>
 
           {target.clamped && (
-            <div style={{
-              background: T.amber50, border: `1px solid ${T.amber}`, borderRadius: 10,
-              padding: '10px 14px', fontSize: 12, color: T.amber, marginBottom: 20,
-            }}>
+            <div style={{ background: T.goldTint, color: T.factInk, borderRadius: T.rCard, padding: '14px 18px', fontSize: 15, marginTop: 16 }}>
               Calories floored at 1200 kcal for safety.
             </div>
           )}
-
-          <button
-            onClick={() => { if (onComplete) onComplete(); else navigate('/app'); }}
-            style={{
-              background: T.green, color: '#fff', border: 'none', borderRadius: 10,
-              padding: '13px 0', width: '100%', fontSize: 15, fontWeight: 700,
-              cursor: 'pointer', fontFamily: T.font,
-            }}
-          >
-            Start tracking
-          </button>
+        </div>
+        <div style={{ position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${T.line}`, padding: '14px 20px calc(14px + env(safe-area-inset-bottom))' }}>
+          <div style={{ maxWidth: 440, margin: '0 auto' }}>
+            <PWButton variant="primary" onClick={() => { if (onComplete) onComplete(); else navigate('/app'); }} style={{ width: '100%' }}>
+              Start tracking
+            </PWButton>
+          </div>
         </div>
       </div>
     );
   }
 
   const currentStep = STEPS[step];
-  const progress = (step / (STEPS.length - 1)) * 100;
+  const optionCard = (selected) => ({
+    background: selected ? T.tintStrong : T.tint,
+    border: `2px solid ${selected ? T.ink : 'transparent'}`,
+    borderRadius: T.rInput, padding: '14px 16px', minHeight: 56,
+    cursor: 'pointer', textAlign: 'left', fontFamily: T.fontBody, color: T.ink,
+  });
 
   return (
-    <div style={{
-      minHeight: '100vh', background: T.bg, fontFamily: T.font,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-    }}>
-      <div style={{
-        background: '#fff', borderRadius: 20, padding: '32px 28px',
-        width: '100%', maxWidth: 380, boxShadow: T.shadow,
-      }}>
-        {/* Progress bar */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: T.inkMute }}>
-              Step {step + 1} of {STEPS.length}
-            </div>
-            <div style={{ fontSize: 11, color: T.inkFaint }}>{STEP_LABELS[step]}</div>
+    <div style={{ minHeight: '100vh', background: T.bg, fontFamily: T.fontBody, color: T.ink, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, maxWidth: 440, width: '100%', margin: '0 auto', padding: '32px 20px 24px', boxSizing: 'border-box' }}>
+        {/* Progress */}
+        <div style={{ marginBottom: 28 }}>
+          <div role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1}
+            aria-label={`Step ${step + 1} of ${STEPS.length}`}
+            style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            {STEPS.map((_, i) => (
+              <span key={i} style={{
+                width: 14, height: 14, borderRadius: '50%', boxSizing: 'border-box',
+                background: i <= step ? T.sage : 'transparent',
+                border: `2px solid ${i <= step ? T.sage : T.lineStrong}`,
+              }} />
+            ))}
           </div>
-          <div style={{ height: 4, background: T.lineSoft, borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', background: T.green, borderRadius: 4,
-              width: `${progress}%`, transition: 'width 0.3s ease',
-            }} />
-          </div>
+          <div style={{ fontSize: 14, color: T.inkMute }}>Step {step + 1} of {STEPS.length}</div>
         </div>
 
-        <div style={{ fontFamily: T.heading, fontSize: 22, fontWeight: 700, color: T.ink, marginBottom: 20 }}>
-          {STEP_LABELS[step]}
-        </div>
+        <h1 style={{ fontFamily: T.fontDisplay, fontSize: 30, fontWeight: 'normal', margin: '0 0 8px', lineHeight: 1.15 }}>
+          {STEP_TITLES[step]}
+        </h1>
+        <p style={{ fontSize: 16, color: T.inkSoft, lineHeight: 1.5, margin: '0 0 22px' }}>{STEP_HELP[step]}</p>
 
         {/* Step content */}
         {currentStep === 'name' && (
@@ -167,28 +163,26 @@ export default function PWOnboarding({ onComplete }) {
             type="text"
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
-            placeholder="Optional — e.g. Avi"
+            placeholder="Optional, e.g. Avi"
+            aria-label="Your name"
             autoFocus
             style={inputStyle(T)}
           />
         )}
 
         {currentStep === 'gender' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {['male', 'female'].map((g) => (
-              <OptionButton key={g} selected={form.gender === g} onClick={() => set('gender', g)}>
-                {g.charAt(0).toUpperCase() + g.slice(1)}
-              </OptionButton>
-            ))}
-          </div>
+          <PWPills fill label="Gender" value={form.gender} onChange={(g) => set('gender', g)}
+            options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} />
         )}
 
         {currentStep === 'age' && (
           <input
             type="number"
+            inputMode="numeric"
             value={form.age}
             onChange={(e) => set('age', e.target.value)}
             placeholder="e.g. 28"
+            aria-label="Age"
             min="10" max="120"
             autoFocus
             style={inputStyle(T)}
@@ -200,14 +194,16 @@ export default function PWOnboarding({ onComplete }) {
             <UnitToggle value={form.unit_pref} onChange={(v) => set('unit_pref', v)} />
             <input
               type="number"
+              inputMode="decimal"
               value={form.height}
               onChange={(e) => set('height', e.target.value)}
               placeholder={form.unit_pref === 'imperial' ? 'e.g. 70 (inches)' : 'e.g. 175 (cm)'}
+              aria-label="Height"
               min="0"
               autoFocus
-              style={{ ...inputStyle(T), marginTop: 12 }}
+              style={{ ...inputStyle(T), marginTop: 14 }}
             />
-            <div style={{ fontSize: 12, color: T.inkFaint, marginTop: 6 }}>
+            <div style={{ fontSize: 14, color: T.inkMute, marginTop: 8 }}>
               {form.unit_pref === 'metric' ? 'Centimetres' : 'Inches'}
             </div>
           </div>
@@ -218,15 +214,17 @@ export default function PWOnboarding({ onComplete }) {
             <UnitToggle value={form.unit_pref} onChange={(v) => set('unit_pref', v)} />
             <input
               type="number"
+              inputMode="decimal"
               value={form.weight}
               onChange={(e) => set('weight', e.target.value)}
               placeholder={form.unit_pref === 'imperial' ? 'e.g. 160 (lbs)' : 'e.g. 72 (kg)'}
+              aria-label="Weight"
               min="0"
               step="0.1"
               autoFocus
-              style={{ ...inputStyle(T), marginTop: 12 }}
+              style={{ ...inputStyle(T), marginTop: 14 }}
             />
-            <div style={{ fontSize: 12, color: T.inkFaint, marginTop: 6 }}>
+            <div style={{ fontSize: 14, color: T.inkMute, marginTop: 8 }}>
               {form.unit_pref === 'metric' ? 'Kilograms' : 'Pounds'}
             </div>
           </div>
@@ -235,21 +233,10 @@ export default function PWOnboarding({ onComplete }) {
         {currentStep === 'activity' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {ACTIVITY_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => set('activity_level', o.value)}
-                style={{
-                  background: form.activity_level === o.value ? T.greenSoft : T.bg,
-                  border: `1.5px solid ${form.activity_level === o.value ? T.green : T.line}`,
-                  borderRadius: 10, padding: '12px 14px',
-                  cursor: 'pointer', textAlign: 'left', fontFamily: T.font,
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ fontSize: 14, fontWeight: 600, color: form.activity_level === o.value ? T.green : T.ink }}>
-                  {o.label}
-                </div>
-                <div style={{ fontSize: 12, color: T.inkMute, marginTop: 2 }}>{o.desc}</div>
+              <button key={o.value} onClick={() => set('activity_level', o.value)} aria-pressed={form.activity_level === o.value}
+                style={optionCard(form.activity_level === o.value)}>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{o.label}</div>
+                <div style={{ fontSize: 14, color: T.inkSoft, marginTop: 2 }}>{o.desc}</div>
               </button>
             ))}
           </div>
@@ -258,123 +245,47 @@ export default function PWOnboarding({ onComplete }) {
         {currentStep === 'goal' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {GOAL_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                onClick={() => set('goal', o.value)}
-                style={{
-                  background: form.goal === o.value ? T.greenSoft : T.bg,
-                  border: `1.5px solid ${form.goal === o.value ? T.green : T.line}`,
-                  borderRadius: 10, padding: '13px 16px',
-                  cursor: 'pointer', textAlign: 'left', fontFamily: T.font,
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  transition: 'all 0.15s',
-                }}
-              >
+              <button key={o.value} onClick={() => set('goal', o.value)} aria-pressed={form.goal === o.value}
+                style={{ ...optionCard(form.goal === o.value), display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 22 }}>{o.icon}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: form.goal === o.value ? T.green : T.ink }}>
-                  {o.label}
-                </span>
+                <span style={{ fontSize: 16, fontWeight: 600 }}>{o.label}</span>
               </button>
             ))}
           </div>
         )}
 
         {error && (
-          <div style={{ background: T.red50, border: `1px solid ${T.red}`, borderRadius: 8, padding: '9px 12px', color: T.red, fontSize: 13, marginTop: 14 }}>
+          <div role="alert" style={{ background: T.dangerTint, borderRadius: 14, padding: '12px 16px', color: T.danger, fontSize: 14, marginTop: 16 }}>
             {error}
           </div>
         )}
+      </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+      <div style={{ position: 'sticky', bottom: 0, background: '#fff', borderTop: `1px solid ${T.line}`, padding: '14px 20px calc(14px + env(safe-area-inset-bottom))' }}>
+        <div style={{ maxWidth: 440, margin: '0 auto', display: 'flex', gap: 12 }}>
           {step > 0 && (
-            <button
-              onClick={() => setStep((s) => s - 1)}
-              style={{
-                background: T.bg, border: `1.5px solid ${T.line}`, borderRadius: 10,
-                padding: '11px 18px', fontSize: 14, fontWeight: 600,
-                color: T.inkSoft, cursor: 'pointer', fontFamily: T.font,
-              }}
-            >
-              Back
-            </button>
+            <PWButton variant="secondary" onClick={() => setStep((s) => s - 1)} style={{ flex: 1 }}>Back</PWButton>
           )}
-          <button
-            onClick={handleNext}
-            disabled={!canAdvance() || loading}
-            style={{
-              flex: 1, background: canAdvance() ? T.green : T.line, color: '#fff',
-              border: 'none', borderRadius: 10, padding: '12px 0',
-              fontSize: 14, fontWeight: 600,
-              cursor: canAdvance() && !loading ? 'pointer' : 'default', fontFamily: T.font,
-              opacity: loading ? 0.7 : 1, transition: 'background 0.2s',
-            }}
-          >
-            {loading ? 'Saving…' : step === STEPS.length - 1 ? 'Calculate targets' : 'Next'}
-          </button>
+          <PWButton variant="primary" onClick={handleNext} disabled={!canAdvance()} busy={loading} style={{ flex: 1.5 }}>
+            {step === STEPS.length - 1 ? 'Finish' : 'Next'}
+          </PWButton>
         </div>
       </div>
     </div>
   );
 }
 
-function OptionButton({ selected, onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: selected ? T.greenSoft : T.bg,
-        border: `1.5px solid ${selected ? T.green : T.line}`,
-        borderRadius: 10, padding: '12px 16px',
-        cursor: 'pointer', textAlign: 'left', fontFamily: T.font,
-        fontSize: 14, fontWeight: selected ? 600 : 400,
-        color: selected ? T.green : T.ink, transition: 'all 0.15s',
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
 function UnitToggle({ value, onChange }) {
   return (
-    <div style={{ display: 'flex', background: T.bg, borderRadius: 8, padding: 3, gap: 3, width: 'fit-content' }}>
-      {['metric', 'imperial'].map((u) => (
-        <button
-          key={u}
-          onClick={() => onChange(u)}
-          style={{
-            padding: '5px 12px', border: 'none', borderRadius: 6,
-            background: value === u ? '#fff' : 'transparent',
-            color: value === u ? T.ink : T.inkMute,
-            fontWeight: value === u ? 600 : 400,
-            fontSize: 12, cursor: 'pointer', fontFamily: T.font,
-            boxShadow: value === u ? T.shadowSoft : 'none',
-          }}
-        >
-          {u.charAt(0).toUpperCase() + u.slice(1)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function StatRow({ label, value, color }) {
-  return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      background: T.bg, borderRadius: 10, padding: '10px 14px',
-    }}>
-      <span style={{ fontSize: 13, color: T.inkSoft }}>{label}</span>
-      <span style={{ fontSize: 15, fontWeight: 700, color }}>{value}</span>
-    </div>
+    <PWPills label="Units" value={value} onChange={onChange}
+      options={[{ value: 'metric', label: 'Metric' }, { value: 'imperial', label: 'Imperial' }]} />
   );
 }
 
 function inputStyle(T) {
   return {
-    width: '100%', boxSizing: 'border-box',
-    padding: '12px 14px', borderRadius: 10,
-    border: `1.5px solid ${T.line}`,
-    background: T.bg, fontSize: 15, fontFamily: T.font, color: T.ink, outline: 'none',
+    width: '100%', boxSizing: 'border-box', height: 56,
+    padding: '0 18px', borderRadius: T.rInput,
+    border: 'none', background: T.tint, fontSize: 16, fontFamily: T.fontBody, color: T.ink, outline: 'none',
   };
 }

@@ -1,15 +1,22 @@
-// client/src/components/PWMealView.jsx — read-only meal detail modal
+// client/src/components/PWMealView.jsx — read-only meal detail
 import React, { useState, useEffect } from 'react';
 import { T, PWIcon2 } from '../tokens.jsx';
+import PWHero from '../ui/PWHero.jsx';
+import PWStats from '../ui/PWStats.jsx';
+import PWLeader from '../ui/PWLeader.jsx';
+import PWButton from '../ui/PWButton.jsx';
+import PWActionBar from '../ui/PWActionBar.jsx';
 
 function fmt(val, unit) {
-  return val != null ? `${Math.round(val)}${unit}` : '—';
+  return val != null ? `${Math.round(val)} ${unit}` : '–';
 }
 
 function toLocalInputValue(d) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+const sectionHead = { fontFamily: T.fontDisplay, fontSize: 22, fontWeight: 'normal', margin: 0, color: T.ink };
 
 export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgain }) {
   const [loggingAgain, setLoggingAgain]   = useState(false);
@@ -24,6 +31,14 @@ export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgai
     setSubmitting(false);
     setLogAgainError(null);
   }, [meal]);
+
+  // Escape closes the view
+  useEffect(() => {
+    if (!meal) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [meal, onClose]);
 
   if (!meal) return null;
 
@@ -48,205 +63,149 @@ export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgai
     }
   };
 
-  const timeLabel = new Date(meal.created_at).toLocaleTimeString(undefined, {
-    hour: 'numeric', minute: '2-digit',
-  });
-  const typeLine = [timeLabel, meal.meal_type].filter(Boolean).join(' · ');
+  const when = new Date(meal.created_at);
+  const typeLabel = meal.meal_type ? meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1) : 'Meal';
+  const whenLine = `${typeLabel} on ${when.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })} at ${when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
 
   const ingredients = Array.isArray(meal.ingredients) ? meal.ingredients : [];
+  const tips = Array.isArray(meal.tips) ? meal.tips : [];
+  const score = Math.max(0, Math.min(10, Math.round(Number(meal.health_score) || 0)));
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(39,26,15,0.35)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-        zIndex: 100, padding: '0 0 0 0',
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: '#fff', borderRadius: '20px 20px 0 0',
-          width: '100%', maxWidth: 480,
-          maxHeight: '90vh', overflowY: 'auto',
-          boxShadow: T.shadow,
-          display: 'flex', flexDirection: 'column',
-        }}
-      >
-        {/* Photo or placeholder */}
-        {meal.photo_url
-          ? <img
-              src={meal.photo_url}
-              alt={meal.name}
-              style={{
-                width: '100%', height: 200, objectFit: 'cover',
-                borderRadius: '20px 20px 0 0', flexShrink: 0,
-              }}
-            />
-          : <div style={{
-              width: '100%', height: 160, borderRadius: '20px 20px 0 0',
-              background: T.lineSoft, flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {PWIcon2.plate(48, T.inkFaint)}
-            </div>
-        }
+    <div role="dialog" aria-modal="true" aria-label={meal.name} style={{
+      position: 'fixed', inset: 0, background: '#fff', zIndex: 100, overflowY: 'auto',
+      display: 'flex', justifyContent: 'center', fontFamily: T.fontBody, color: T.ink,
+    }}>
+      <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+        <PWHero onBack={onClose} backLabel="Close" src={meal.photo_url} name={meal.name} />
 
-        {/* Content */}
-        <div style={{ padding: '20px 20px 28px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ padding: '0 20px', textAlign: 'center' }}>
+          <h1 style={{ fontFamily: T.fontDisplay, fontSize: 30, fontWeight: 'normal', margin: 0, lineHeight: 1.15 }}>{meal.name}</h1>
+          <div style={{ fontSize: 15, color: T.inkMute, marginTop: 6 }}>{whenLine}</div>
+        </div>
 
-          {/* Name + meta */}
-          <div>
-            <div style={{ fontFamily: T.heading, fontSize: 22, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px', lineHeight: 1.2 }}>
-              {meal.name}
-            </div>
-            {typeLine && (
-              <div style={{ fontSize: 12, color: T.inkMute, marginTop: 4 }}>{typeLine}</div>
-            )}
-          </div>
+        <div style={{ margin: '22px 0' }}>
+          <PWStats calories={meal.calories} protein={meal.protein_g} carbs={meal.carbs_g} fat={meal.fat_g} />
+        </div>
 
-          {/* Calories */}
-          <div style={{ fontFamily: T.heading, fontSize: 36, fontWeight: 700, color: T.green, lineHeight: 1 }}>
-            {Math.round(meal.calories)}
-            <span style={{ fontSize: 14, fontWeight: 400, color: T.inkMute, fontFamily: T.font }}> kcal</span>
-          </div>
+        <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 26 }}>
 
-          {/* Macros */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            {[
-              { label: 'Carbs',   value: meal.carbs_g,   unit: 'g', color: T.amber },
-              { label: 'Protein', value: meal.protein_g, unit: 'g', color: T.sage },
-              { label: 'Fat',     value: meal.fat_g,     unit: 'g', color: T.fat },
-            ].map(({ label, value, unit, color }) => (
-              <div key={label} style={{
-                flex: 1, background: T.lineSoft, borderRadius: 10, padding: '9px 10px', textAlign: 'center',
-              }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: T.ink }}>{fmt(value, unit)}</div>
-                <div style={{ fontSize: 9.5, color: T.inkMute, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Micros */}
-          <div style={{ background: T.lineSoft, borderRadius: 12, overflow: 'hidden' }}>
-            {[
-              ['Fiber',  meal.fiber_g,   'g'],
-              ['Sugar',  meal.sugar_g,   'g'],
-              ['Sodium', meal.sodium_mg, 'mg'],
-            ].map(([label, val, unit], i) => (
-              <div key={label} style={{
-                display: 'flex', justifyContent: 'space-between',
-                padding: '8px 14px',
-                borderBottom: i < 2 ? `1px solid ${T.line}` : 'none',
-              }}>
-                <span style={{ fontSize: 13, color: T.inkSoft }}>{label}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{fmt(val, unit)}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Ingredients */}
-          {ingredients.length > 0 && (
-            <div>
-              <div style={{ fontSize: 10.5, fontWeight: 700, color: T.inkMute, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
-                Ingredients
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {ingredients.map((ing, i) => (
-                  <div key={i} style={{ fontSize: 13, color: T.inkSoft, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{ing.name}</span>
-                    <span style={{ color: T.inkFaint }}>{ing.quantity} {ing.unit}</span>
-                  </div>
+          {meal.health_score != null && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              <span style={{ fontSize: 16 }}>Health score <strong>{score}</strong> of 10</span>
+              <span aria-hidden="true" style={{ display: 'flex', gap: 4 }}>
+                {Array.from({ length: 10 }, (_, i) => (
+                  <span key={i} style={{
+                    width: 13, height: 13, borderRadius: '50%', boxSizing: 'border-box',
+                    background: i < score ? T.sage : 'transparent',
+                    border: i < score ? 'none' : `2px solid ${T.lineStrong}`,
+                  }} />
                 ))}
-              </div>
+              </span>
             </div>
           )}
 
-          {/* Log again — timestamp row (history only) */}
+          <section style={{ display: 'flex', gap: 10 }}>
+            {[
+              ['Fiber', meal.fiber_g, 'g'],
+              ['Sugar', meal.sugar_g, 'g'],
+              ['Sodium', meal.sodium_mg, 'mg'],
+            ].map(([l, v, u]) => (
+              <div key={l} style={{ flex: 1, border: `1.5px solid ${T.line}`, borderRadius: T.rInput, padding: '12px 8px', textAlign: 'center' }}>
+                <div style={{ fontSize: 17, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmt(v, u)}</div>
+                <div style={{ fontSize: 13, color: T.inkMute, marginTop: 2 }}>{l}</div>
+              </div>
+            ))}
+          </section>
+
+          {ingredients.length > 0 && (
+            <section>
+              <h2 style={{ ...sectionHead, marginBottom: 4 }}>Ingredients</h2>
+              {ingredients.map((ing, i) => (
+                <PWLeader
+                  key={i}
+                  label={ing.name}
+                  value={ing.quantity}
+                  unit={ing.unit}
+                  strong={false}
+                  right={Number.isFinite(Number(ing.calories)) ? (
+                    <span style={{ fontSize: 15, color: T.inkMute, whiteSpace: 'nowrap', marginLeft: 6, fontVariantNumeric: 'tabular-nums' }}>
+                      {Math.round(ing.calories)} kcal
+                    </span>
+                  ) : null}
+                />
+              ))}
+            </section>
+          )}
+
+          {meal.fact && (
+            <section style={{ background: T.goldTint, borderRadius: T.rCard, padding: '18px 20px' }}>
+              <div style={{ fontFamily: T.fontDisplay, fontSize: 18, lineHeight: 1.4, color: T.factInk }}>{meal.fact}</div>
+            </section>
+          )}
+
+          {tips.length > 0 && (
+            <section>
+              <h2 style={{ ...sectionHead, marginBottom: 6 }}>Healthier swaps</h2>
+              {tips.map((tip, i) => (
+                <div key={i} style={{
+                  display: 'flex', gap: 12, alignItems: 'flex-start', padding: '12px 0',
+                  borderBottom: i < tips.length - 1 ? `1px solid ${T.line}` : 'none', fontSize: 16, lineHeight: 1.4,
+                }}>
+                  <span style={{ flexShrink: 0, marginTop: 1 }}>{PWIcon2.check(20, T.sage)}</span>
+                  <span>{tip}</span>
+                </div>
+              ))}
+            </section>
+          )}
+
           {origin === 'history' && loggingAgain && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <section style={{ background: T.tint, borderRadius: T.rCard, padding: 16 }}>
+              <label htmlFor="pw-logagain-at" style={{ display: 'block', fontSize: 14, color: T.inkSoft, marginBottom: 6 }}>
+                Log this meal at
+              </label>
               <input
+                id="pw-logagain-at"
                 type="datetime-local"
                 value={logAgainAt}
                 onChange={(e) => setLogAgainAt(e.target.value)}
                 style={{
-                  flex: 1, minWidth: 0, border: `1.5px solid ${T.line}`, borderRadius: 10,
-                  padding: '10px 12px', fontSize: 14, fontFamily: 'inherit',
-                  color: T.ink, outline: 'none', background: '#fff',
+                  width: '100%', height: 52, border: 'none', borderRadius: T.rInput, background: '#fff',
+                  padding: '0 14px', fontSize: 16, fontFamily: T.fontBody, color: T.ink, outline: 'none', boxSizing: 'border-box',
                 }}
               />
-              <button
-                onClick={onLogAgain}
-                disabled={submitting || !logAgainAt}
-                style={{
-                  padding: '10px 16px', borderRadius: 10, border: 'none',
-                  background: T.green, color: '#fff', fontWeight: 700,
-                  cursor: submitting || !logAgainAt ? 'default' : 'pointer',
-                  fontFamily: T.font, fontSize: 14,
-                  opacity: submitting || !logAgainAt ? 0.6 : 1,
-                }}
-              >
-                {submitting ? '…' : 'Confirm'}
-              </button>
-              <button
-                onClick={() => setLoggingAgain(false)}
-                style={{
-                  padding: '10px 12px', borderRadius: 10,
-                  border: `1.5px solid ${T.line}`, background: '#fff',
-                  cursor: 'pointer', fontFamily: T.font, fontSize: 14, color: T.inkSoft,
-                }}
-              >
-                Cancel
-              </button>
-            </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <PWButton variant="secondary" onClick={() => setLoggingAgain(false)} style={{ flex: 1, height: 48, fontSize: 16 }}>Cancel</PWButton>
+                <PWButton variant="primary" onClick={onLogAgain} busy={submitting} disabled={!logAgainAt} style={{ flex: 1, height: 48, fontSize: 16 }}>
+                  Confirm
+                </PWButton>
+              </div>
+            </section>
           )}
 
           {logAgainError && (
-            <div style={{ background: T.red50, color: T.red, borderRadius: 10, padding: '9px 12px', fontSize: 12.5 }}>
-              ⚠ {logAgainError}
+            <div style={{ background: T.dangerTint, color: T.danger, borderRadius: 14, padding: '12px 16px', fontSize: 15 }}>
+              {logAgainError}
             </div>
           )}
-
-          {/* Footer buttons */}
-          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-            {origin === 'history' && !loggingAgain && (
-              <button
-                onClick={() => { setLoggingAgain(true); setLogAgainAt(toLocalInputValue(new Date())); }}
-                style={{
-                  flex: 1, padding: '12px', borderRadius: 12,
-                  border: `1.5px solid ${T.line}`, background: '#fff',
-                  cursor: 'pointer', fontFamily: T.font, fontSize: 14,
-                  fontWeight: 600, color: T.inkSoft,
-                }}
-              >
-                ↻ Log again
-              </button>
-            )}
-            <button
-              onClick={onEdit}
-              style={{
-                flex: 1, padding: '12px', borderRadius: 12,
-                border: `1.5px solid ${T.line}`, background: '#fff',
-                cursor: 'pointer', fontFamily: T.font, fontSize: 14,
-                fontWeight: 600, color: T.inkSoft,
-              }}
-            >
-              Edit
-            </button>
-            <button
-              onClick={onClose}
-              style={{
-                flex: 1, padding: '12px', borderRadius: 12,
-                border: `1.5px solid ${T.line}`, background: '#fff',
-                cursor: 'pointer', fontFamily: T.font, fontSize: 14,
-                fontWeight: 600, color: T.inkSoft,
-              }}
-            >
-              Close
-            </button>
-          </div>
         </div>
+
+        <div style={{ flex: 1 }} />
+        <PWActionBar>
+          {origin === 'history' ? (
+            <>
+              <PWButton variant="secondary" onClick={onEdit} style={{ flex: 1 }}>Edit</PWButton>
+              {!loggingAgain && (
+                <PWButton variant="primary" style={{ flex: 1.5 }}
+                  onClick={() => { setLoggingAgain(true); setLogAgainAt(toLocalInputValue(new Date())); }}>
+                  Log again
+                </PWButton>
+              )}
+            </>
+          ) : (
+            <PWButton variant="primary" onClick={onEdit} style={{ width: '100%' }}>Edit</PWButton>
+          )}
+        </PWActionBar>
       </div>
     </div>
   );

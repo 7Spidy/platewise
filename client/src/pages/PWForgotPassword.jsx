@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { T } from '../tokens.jsx';
+import PWAuthLayout, { AuthField, AuthError, authInput, authLink } from '../ui/PWAuthLayout.jsx';
+import PWButton from '../ui/PWButton.jsx';
 
 export default function PWForgotPassword() {
   const navigate = useNavigate();
@@ -33,78 +35,24 @@ export default function PWForgotPassword() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh', background: T.bg, fontFamily: T.font,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-    }}>
-      <div style={{
-        background: '#fff', borderRadius: 20, padding: '32px 28px',
-        width: '100%', maxWidth: 380, boxShadow: T.shadow,
-      }}>
-        <button
-          onClick={() => navigate('/login')}
-          style={{ background: 'none', border: 'none', color: T.green, cursor: 'pointer', fontSize: 13, padding: '0 0 16px', fontFamily: T.font }}
-        >
-          ← Back to sign in
-        </button>
-
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontFamily: T.heading, fontSize: 22, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px', marginBottom: 6 }}>
-            Forgot password
-          </div>
-          <div style={{ fontSize: 13, color: T.inkMute, lineHeight: 1.6 }}>
-            Enter your email and we'll send a reset link valid for 30 minutes.
-          </div>
+    <PWAuthLayout title="Forgot password" subtitle="Enter your email and we'll send a reset link valid for 30 minutes." plate="chai">
+      {sent ? (
+        <div style={{ background: T.tint, borderRadius: T.rCard, padding: '16px 18px', color: T.sageInk, fontSize: 16, lineHeight: 1.5 }}>
+          If an account exists for <strong>{email}</strong>, you'll receive a reset link shortly. Check your spam folder too.
         </div>
-
-        {sent ? (
-          <div style={{
-            background: T.sageSoft, border: `1px solid ${T.sage}`, borderRadius: 12,
-            padding: '16px 18px', color: T.sage, fontSize: 14, lineHeight: 1.6,
-          }}>
-            If an account exists for <strong>{email}</strong>, you'll receive a reset link shortly. Check your spam folder too.
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: T.inkSoft, display: 'block', marginBottom: 5 }}>
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                placeholder="you@example.com"
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  padding: '10px 12px', borderRadius: 9,
-                  border: `1.5px solid ${T.line}`,
-                  background: T.bg, fontSize: 14, fontFamily: T.font, color: T.ink, outline: 'none',
-                }}
-              />
-            </div>
-            {error && (
-              <div style={{ background: T.red50, border: `1px solid ${T.red}`, borderRadius: 8, padding: '9px 12px', color: T.red, fontSize: 13 }}>
-                {error}
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                background: T.green, color: '#fff', border: 'none', borderRadius: 10,
-                padding: '12px 0', fontSize: 14, fontWeight: 600,
-                cursor: loading ? 'default' : 'pointer', fontFamily: T.font,
-                opacity: loading ? 0.7 : 1,
-              }}
-            >
-              {loading ? 'Sending…' : 'Send reset link'}
-            </button>
-          </form>
-        )}
+      ) : (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <AuthField label="Email" id="forgot-email">
+            <input id="forgot-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              required autoComplete="email" placeholder="you@example.com" style={authInput} />
+          </AuthField>
+          <AuthError>{error}</AuthError>
+          <PWButton type="submit" variant="primary" busy={loading} style={{ width: '100%' }}>Send reset link</PWButton>
+        </form>
+      )}
+      <div style={{ textAlign: 'center', marginTop: 14 }}>
+        <button type="button" onClick={() => navigate('/login')} style={authLink}>Back to sign in</button>
       </div>
-    </div>
+    </PWAuthLayout>
   );
 }

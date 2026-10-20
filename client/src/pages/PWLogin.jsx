@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { T } from '../tokens.jsx';
+import PWAuthLayout, { AuthField, AuthError, authInput, authLink } from '../ui/PWAuthLayout.jsx';
+import PWPills from '../ui/PWPills.jsx';
+import PWButton from '../ui/PWButton.jsx';
 
 export default function PWLogin() {
   const navigate = useNavigate();
@@ -42,146 +45,46 @@ export default function PWLogin() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh', background: T.bg, fontFamily: T.font,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 24,
-    }}>
-      <div style={{
-        background: '#fff', borderRadius: 20, padding: '32px 28px',
-        width: '100%', maxWidth: 380, boxShadow: T.shadow,
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: T.heading, fontSize: 28, fontWeight: 700, color: T.ink, letterSpacing: '-0.5px' }}>
-            Platewise
-          </div>
-          <div style={{ fontSize: 13, color: T.inkMute, marginTop: 4 }}>Sign in to your account</div>
-        </div>
+    <PWAuthLayout title="Welcome back" subtitle="Sign in to your account" plate="thali">
+      <div style={{ marginBottom: 20 }}>
+        <PWPills fill label="Sign in method" value={mode}
+          onChange={(m) => { setMode(m); setError(''); }}
+          options={[{ value: 'email', label: 'Email' }, { value: 'passcode', label: 'Passcode' }]} />
+      </div>
 
-        {/* Mode toggle */}
-        <div style={{
-          display: 'flex', background: T.bg, borderRadius: 10, padding: 3,
-          marginBottom: 20, gap: 3,
-        }}>
-          {['email', 'passcode'].map((m) => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setError(''); }}
-              style={{
-                flex: 1, padding: '7px 0', border: 'none', borderRadius: 8,
-                background: mode === m ? '#fff' : 'transparent',
-                color: mode === m ? T.ink : T.inkMute,
-                fontWeight: mode === m ? 600 : 400,
-                fontSize: 13, cursor: 'pointer', fontFamily: T.font,
-                boxShadow: mode === m ? T.shadowSoft : 'none',
-                transition: 'all 0.15s',
-              }}
-            >
-              {m === 'email' ? 'Email' : 'Passcode'}
-            </button>
-          ))}
-        </div>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {mode === 'email' ? (
+          <>
+            <AuthField label="Email" id="login-email">
+              <input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                required autoComplete="email" placeholder="you@example.com" style={authInput} />
+            </AuthField>
+            <AuthField label="Password" id="login-password">
+              <input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                required autoComplete="current-password" placeholder="Your password" style={authInput} />
+            </AuthField>
+          </>
+        ) : (
+          <AuthField label="Admin passcode" id="login-passcode">
+            <input id="login-passcode" type="password" value={passcode} onChange={(e) => setPasscode(e.target.value)}
+              required autoComplete="off" placeholder="Enter passcode" style={authInput} />
+          </AuthField>
+        )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {mode === 'email' ? (
-            <>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: T.inkSoft, display: 'block', marginBottom: 5 }}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  style={inputStyle(T)}
-                />
-              </div>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: T.inkSoft }}>Password</label>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/forgot-password')}
-                    style={{ background: 'none', border: 'none', fontSize: 12, color: T.green, cursor: 'pointer', padding: 0 }}
-                  >
-                    Forgot?
-                  </button>
-                </div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  style={inputStyle(T)}
-                />
-              </div>
-            </>
-          ) : (
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: T.inkSoft, display: 'block', marginBottom: 5 }}>
-                Admin Passcode
-              </label>
-              <input
-                type="password"
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
-                required
-                autoComplete="off"
-                placeholder="Enter passcode"
-                style={inputStyle(T)}
-              />
-            </div>
-          )}
+        <AuthError>{error}</AuthError>
 
-          {error && (
-            <div style={{
-              background: T.red50, border: `1px solid ${T.red}`,
-              borderRadius: 8, padding: '9px 12px',
-              color: T.red, fontSize: 13,
-            }}>
-              {error}
-            </div>
-          )}
+        <PWButton type="submit" variant="primary" busy={loading} style={{ width: '100%' }}>Sign in</PWButton>
+      </form>
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              background: T.green, color: '#fff', border: 'none',
-              borderRadius: 10, padding: '12px 0', fontSize: 14,
-              fontWeight: 600, cursor: loading ? 'default' : 'pointer',
-              fontFamily: T.font, opacity: loading ? 0.7 : 1, marginTop: 4,
-            }}
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: T.inkMute }}>
-          Don't have an account?{' '}
-          <button
-            onClick={() => navigate('/')}
-            style={{ background: 'none', border: 'none', color: T.green, cursor: 'pointer', fontWeight: 600, fontSize: 13, padding: 0 }}
-          >
-            Join waitlist
-          </button>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, marginTop: 14 }}>
+        {mode === 'email' && (
+          <button type="button" onClick={() => navigate('/forgot-password')} style={authLink}>Forgot password?</button>
+        )}
+        <div style={{ fontSize: 15, color: T.inkSoft, display: 'flex', alignItems: 'center', gap: 6 }}>
+          Don't have an account?
+          <button type="button" onClick={() => navigate('/')} style={authLink}>Join waitlist</button>
         </div>
       </div>
-    </div>
+    </PWAuthLayout>
   );
-}
-
-function inputStyle(T) {
-  return {
-    width: '100%', boxSizing: 'border-box',
-    padding: '10px 12px', borderRadius: 9,
-    border: `1.5px solid ${T.line}`,
-    background: T.bg, fontSize: 14, fontFamily: T.font, color: T.ink,
-    outline: 'none',
-  };
 }

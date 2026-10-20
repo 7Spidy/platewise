@@ -1,39 +1,59 @@
 // client/src/components/PWHistory.jsx
-import React, { useEffect, useState } from 'react';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { T, PWIcon2, BottomNav, isoDate } from '../tokens.jsx';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
+import { T, PWIcon2, isoDate, MACRO_COLORS } from '../tokens.jsx';
+import PWNav from '../ui/PWNav.jsx';
+import PWPlate from '../ui/PWPlate.jsx';
+import PWPills from '../ui/PWPills.jsx';
+import PWLeader from '../ui/PWLeader.jsx';
+import PWButton from '../ui/PWButton.jsx';
+import PWDayPlate from '../ui/PWDayPlate.jsx';
 import PWConfirm from './PWConfirm.jsx';
 import PWMealView from './PWMealView.jsx';
 
-function fmtDayLabel(dateStr) {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, {
-    weekday: 'short', month: 'short', day: 'numeric',
-  });
+const dateOf = (s) => new Date(s + 'T00:00:00');
+
+function fmtDayName(dateStr) {
+  return dateOf(dateStr).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' });
 }
 
 function fmtXTick(dateStr, range) {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = dateOf(dateStr);
   if (range <= 7) return d.toLocaleDateString(undefined, { weekday: 'short' });
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function fmtSpan(first, last) {
+  const a = dateOf(first);
+  const b = dateOf(last);
+  const month = (d) => d.toLocaleDateString(undefined, { month: 'long' });
+  if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()) {
+    return `${a.getDate()} to ${b.getDate()} ${month(b)}`;
+  }
+  const short = (d) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return `${short(a)} to ${short(b)}`;
+}
 
 const LEGEND = [
-  { key: 'total_calories',  label: 'Calories', color: T.green,  dash: '' },
-  { key: 'total_protein_g', label: 'Protein',  color: T.sage,   dash: '5 5' },
-  { key: 'total_carbs_g',   label: 'Carbs',    color: T.amber,  dash: '2 3' },
-  { key: 'total_fat_g',     label: 'Fat',      color: T.fat,    dash: '8 3 2 3' },
+  { label: 'Calories', color: T.ink,                 dash: '' },
+  { label: 'Protein',  color: MACRO_COLORS.protein,  dash: '5 5' },
+  { label: 'Carbs',    color: MACRO_COLORS.carbs,    dash: '2 3' },
+  { label: 'Fat',      color: MACRO_COLORS.fat,      dash: '8 3 2 3' },
 ];
 
-export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEditMeal }) {
+const typeLabel = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Meal');
+
+export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEditMeal, onYou }) {
   const [range, setRange]               = useState(7);
   const [days, setDays]                 = useState(null);
-  const [openDay, setOpenDay]           = useState(null);
+  const [selected, setSelected]         = useState(null);
   const [target, setTarget]             = useState(2200);
   const [error, setError]               = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null);
   const [viewingMeal, setViewingMeal]     = useState(null);
   const [showTrend, setShowTrend]         = useState(false);
+
+  const todayIso = isoDate(0);
 
   const load = async () => {
     try {
@@ -46,7 +66,7 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
       if (histRes.ok) {
         const data = await histRes.json();
         setDays(data.days);
-        if (data.days.length) setOpenDay(data.days[0].date);
+        setSelected((cur) => (cur && data.days.some((d) => d.date === cur) ? cur : (data.days[0]?.date ?? null)));
       }
       if (settingsRes.ok) setTarget((await settingsRes.json()).target_calories || 2200);
     } catch {
@@ -55,20 +75,6 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
   };
 
   useEffect(() => { load(); }, [range]);
-
-  const calColor = (cal) => {
-    if (cal === 0)           return T.inkFaint;
-    if (cal <= target)       return T.green;
-    if (cal <= target * 1.1) return T.amber;
-    return T.red;
-  };
-
-  const calBarColor = (cal) => {
-    if (cal === 0)           return T.lineSoft;
-    if (cal <= target)       return T.green;
-    if (cal <= target * 1.1) return T.amber;
-    return T.red;
-  };
 
   const handleDelete = async () => {
     if (!confirmTarget) return;
@@ -81,205 +87,188 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
     load();
   };
 
-  // Chart data sorted oldest-first for left-to-right rendering
-  const chartData = days ? [...days].reverse() : [];
-  // Determine tick interval for x-axis to avoid crowding
+  // Oldest first for plates and chart.
+  const ordered = useMemo(() => (days ? [...days].reverse() : []), [days]);
+
+  const summary = useMemo(() => {
+    if (!days) return null;
+    const logged = days.filter((d) => d.meals.length > 0);
+    const finished = logged.filter((d) => d.date !== todayIso);
+    const avg = finished.length ? Math.round(finished.reduce((s, d) => s + d.total_calories, 0) / finished.length) : null;
+    const overCount = logged.filter((d) => target > 0 && d.total_calories > target).length;
+    const counts = new Map();
+    for (const d of days) {
+      for (const m of d.meals) {
+        const key = (m.name || '').trim().toLowerCase();
+        if (!key) continue;
+        const cur = counts.get(key) || { name: m.name.trim(), n: 0 };
+        cur.n += 1;
+        counts.set(key, cur);
+      }
+    }
+    let top = null;
+    for (const v of counts.values()) if (!top || v.n > top.n) top = v;
+    return { avg, overCount, loggedDays: logged.length, top };
+  }, [days, target, todayIso]);
+
+  const selectedDay = days?.find((d) => d.date === selected) || null;
   const tickCount = range <= 7 ? 1 : 5;
+
+  const plateFor = (d) => {
+    const fraction = target > 0 ? d.total_calories / target : 0;
+    return { fraction, over: target > 0 && d.total_calories > target, isToday: d.date === todayIso };
+  };
+
+  // 30-day grid: Monday-first, leading blanks.
+  const leadingBlanks = ordered.length ? (dateOf(ordered[0].date).getDay() + 6) % 7 : 0;
 
   return (
     <div style={{
-      width: '100%', minHeight: '100%', background: T.bg, fontFamily: T.font,
-      padding: '24px 20px 100px', boxSizing: 'border-box',
-      display: 'flex', flexDirection: 'column', gap: 14,
+      width: '100%', minHeight: '100%', background: T.bg, fontFamily: T.fontBody, color: T.ink,
+      padding: '28px 20px 120px', boxSizing: 'border-box',
     }}>
 
-      {/* Header */}
-      <div style={{ fontFamily: T.heading, fontSize: 24, fontWeight: 700, color: T.ink, letterSpacing: '-0.3px' }}>
-        History
-      </div>
-
-      {/* 7D / 30D toggle */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        {[7, 30].map((r) => (
-          <button key={r} onClick={() => { setRange(r); setShowTrend(false); }} style={{
-            padding: '7px 18px', borderRadius: 20, border: 'none', cursor: 'pointer',
-            fontFamily: T.font, fontSize: 12.5, fontWeight: 700,
-            background: range === r ? T.green : T.lineSoft,
-            color: range === r ? '#fff' : T.inkMute,
-            transition: 'all 0.15s ease',
-          }}>
-            {r}D
-          </button>
-        ))}
-      </div>
-
-      {/* Trend chart — collapsed placeholder */}
-      {days !== null && !showTrend && (
-        <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.line}`, boxShadow: T.shadowSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 0' }}>
-          <button onClick={() => setShowTrend(true)} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontFamily: T.font, fontSize: 13, fontWeight: 600, color: T.inkMute,
-            padding: '4px 12px',
-          }}>
-            Show Trend
-            {PWIcon2.chevDown(11, T.inkMute)}
-          </button>
+      <h1 style={{ fontFamily: T.fontDisplay, fontSize: 34, fontWeight: 'normal', margin: 0, lineHeight: 1.15 }}>
+        {range === 7 ? 'This week' : 'Last 30 days'}
+      </h1>
+      {ordered.length > 0 && (
+        <div style={{ fontSize: 15, color: T.inkMute, margin: '4px 0 16px' }}>
+          {fmtSpan(ordered[0].date, ordered[ordered.length - 1].date)}
         </div>
       )}
 
-      {/* Trend chart — expanded */}
-      {days !== null && showTrend && (
-        <div style={{ background: '#fff', borderRadius: 14, border: `1px solid ${T.line}`, padding: '14px 6px 10px', boxShadow: T.shadowSoft }}>
-          {/* Hide Trend header */}
-          <button onClick={() => setShowTrend(false)} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontFamily: T.font, fontSize: 13, fontWeight: 600, color: T.inkMute,
-            paddingLeft: 10, marginBottom: 8,
-          }}>
-            Hide Trend
-            <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>
-              {PWIcon2.chevDown(11, T.inkMute)}
-            </span>
-          </button>
-          {/* Custom legend */}
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', paddingLeft: 10, marginBottom: 10 }}>
-            {LEGEND.map(({ label, color, dash }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <svg width="22" height="10">
-                  <line x1="0" y1="5" x2="22" y2="5" stroke={color} strokeWidth="2"
-                    strokeDasharray={dash || undefined} />
-                </svg>
-                <span style={{ fontSize: 11, color: T.inkSoft, fontWeight: 500 }}>{label}</span>
-              </div>
-            ))}
-          </div>
-          <ResponsiveContainer width="100%" height={160}>
-            <LineChart data={chartData} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.lineSoft} />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 9, fill: T.inkFaint }}
-                tickFormatter={(d) => fmtXTick(d, range)}
-                interval={tickCount - 1}
-              />
-              <YAxis yAxisId="cal" orientation="left"  tick={{ fontSize: 9, fill: T.inkFaint }} width={34} />
-              <YAxis yAxisId="grams" orientation="right" tick={{ fontSize: 9, fill: T.inkFaint }} width={28} />
-              <Tooltip
-                contentStyle={{ fontSize: 11, border: `1px solid ${T.line}`, borderRadius: 8 }}
-                labelFormatter={(d) => fmtDayLabel(d)}
-              />
-              <Line yAxisId="cal"   dataKey="total_calories"  stroke={T.green} strokeWidth={2} dot={false} />
-              <Line yAxisId="grams" dataKey="total_protein_g" stroke={T.sage}  strokeWidth={1.5} dot={false} strokeDasharray="5 5" />
-              <Line yAxisId="grams" dataKey="total_carbs_g"   stroke={T.amber} strokeWidth={1.5} dot={false} strokeDasharray="2 3" />
-              <Line yAxisId="grams" dataKey="total_fat_g"     stroke={T.fat}   strokeWidth={1.5} dot={false} strokeDasharray="8 3 2 3" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      <PWPills label="Range" value={range} onChange={(r) => { setRange(r); setShowTrend(false); }}
+        options={[{ value: 7, label: '7 days' }, { value: 30, label: '30 days' }]} />
 
-      {error && <div style={{ color: T.red, fontSize: 12.5 }}>{error}</div>}
+      {error && <div style={{ color: T.danger, background: T.dangerTint, borderRadius: 12, padding: '10px 14px', fontSize: 14, marginTop: 14 }}>{error}</div>}
       {days === null && !error && (
-        <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 13, marginTop: 30 }}>Loading…</div>
+        <div style={{ textAlign: 'center', color: T.inkMute, fontSize: 15, marginTop: 30 }}>Loading…</div>
       )}
 
-      {/* Day rows */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {days !== null && days.map((day) => {
-          const isOpen = openDay === day.date;
-          const pct    = target > 0 ? Math.min(1, day.total_calories / target) : 0;
-          return (
-            <div key={day.date} style={{
-              background: '#fff', border: `1px solid ${T.line}`, borderRadius: 14, overflow: 'hidden',
-              boxShadow: T.shadowSoft,
-            }}>
-              <button onClick={() => setOpenDay(isOpen ? null : day.date)} style={{
-                width: '100%', display: 'flex', flexDirection: 'column',
-                padding: '12px 16px 10px', background: 'none', border: 'none',
-                cursor: 'pointer', fontFamily: T.font, gap: 8,
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 600, color: T.ink }}>
-                    <span style={{
-                      transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
-                      transition: 'transform 0.15s', display: 'inline-flex',
-                    }}>
-                      {PWIcon2.chevDown(11, T.green)}
-                    </span>
-                    {fmtDayLabel(day.date)}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: calColor(day.total_calories) }}>
-                    {day.total_calories > 0 ? `${Math.round(day.total_calories)} kcal` : '—'}
-                  </span>
-                </div>
-                <div style={{ height: 4, background: T.lineSoft, borderRadius: 2, width: '100%', overflow: 'hidden' }}>
-                  <div style={{
-                    width: `${pct * 100}%`, height: '100%',
-                    background: calBarColor(day.total_calories), borderRadius: 2,
-                    transition: 'width 0.4s ease',
-                  }} />
-                </div>
-              </button>
-
-              {isOpen && (
-                <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {day.meals.length === 0 && (
-                    <div style={{ fontSize: 12, color: T.inkFaint }}>— no meals logged</div>
-                  )}
-                  {day.meals.map((m) => (
-                    <div key={m.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      background: T.lineSoft, borderRadius: 10, padding: '8px 10px',
-                    }}>
-                      {/* Thumbnail */}
-                      {m.photo_url
-                        ? <img src={m.photo_url} alt="" style={{
-                            width: 44, height: 44, objectFit: 'cover', borderRadius: 10,
-                            flexShrink: 0,
-                          }} />
-                        : <div style={{
-                            width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-                            background: T.lineSoft, border: `1px solid ${T.line}`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            {PWIcon2.plate(20, T.inkFaint)}
-                          </div>
-                      }
-                      {/* Info */}
-                      <button onClick={() => setViewingMeal(m)} style={{
-                        flex: 1, background: 'none', border: 'none', padding: 0,
-                        cursor: 'pointer', fontFamily: T.font,
-                        textAlign: 'left', minWidth: 0,
-                      }}>
-                        <div style={{ fontSize: 13, color: T.ink, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {m.name}
-                          <span style={{ color: T.inkFaint, fontWeight: 400 }}>
-                            {' '}· {new Date(m.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: T.green, marginTop: 1 }}>
-                          {Math.round(m.calories)} cal
-                        </div>
-                      </button>
-                      {/* Actions */}
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                        <button
-                          onClick={() => setConfirmTarget(m)}
-                          title="Delete"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                        >
-                          {PWIcon2.trash(14)}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+      {days !== null && (
+        <>
+          {/* Day plates */}
+          {range === 7 ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', margin: '18px -4px 0' }}>
+              {ordered.map((d) => (
+                <button key={d.date} onClick={() => setSelected(d.date)} aria-pressed={selected === d.date}
+                  aria-label={`${fmtDayName(d.date)}, ${Math.round(d.total_calories)} kcal`}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', minWidth: 44, minHeight: 44 }}>
+                  <PWDayPlate {...plateFor(d)} selected={selected === d.date} size={38}
+                    label={dateOf(d.date).toLocaleDateString(undefined, { weekday: 'short' })} />
+                </button>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 2, margin: '18px 0 0', justifyItems: 'center' }}>
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((l, i) => (
+                <span key={i} aria-hidden="true" style={{ fontSize: 13, color: T.inkMute, paddingBottom: 4 }}>{l}</span>
+              ))}
+              {Array.from({ length: leadingBlanks }, (_, i) => <span key={`b${i}`} />)}
+              {ordered.map((d) => (
+                <button key={d.date} onClick={() => setSelected(d.date)} aria-pressed={selected === d.date}
+                  aria-label={`${fmtDayName(d.date)}, ${Math.round(d.total_calories)} kcal`}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', minWidth: 44, minHeight: 44 }}>
+                  <PWDayPlate {...plateFor(d)} selected={selected === d.date} size={30} label={dateOf(d.date).getDate()} />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Summary */}
+          {summary && (
+            <section style={{ background: T.tint, borderRadius: T.rCard, padding: '14px 20px', margin: '22px 0 14px' }}>
+              <PWLeader label="Daily average" value={summary.avg != null ? summary.avg.toLocaleString() : '–'} unit={summary.avg != null ? 'kcal' : undefined} />
+              <PWLeader label="Over target" value={`${summary.overCount} of ${summary.loggedDays}`} unit="days" />
+              {summary.top && <PWLeader label="Most logged" value={summary.top.name} />}
+            </section>
+          )}
+
+          {/* Trend */}
+          <PWButton variant="soft" onClick={() => setShowTrend((v) => !v)} aria-expanded={showTrend} style={{ width: '100%', height: 48, fontSize: 16 }}>
+            {showTrend ? 'Hide trend' : 'Show trend'}
+          </PWButton>
+
+          {showTrend && (
+            <div style={{ border: `1.5px solid ${T.line}`, borderRadius: T.rCard, padding: '14px 6px 10px', marginTop: 12 }}>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', paddingLeft: 10, marginBottom: 10 }}>
+                {LEGEND.map(({ label, color, dash }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <svg width="22" height="10" aria-hidden="true">
+                      <line x1="0" y1="5" x2="22" y2="5" stroke={color} strokeWidth="2" strokeDasharray={dash || undefined} />
+                    </svg>
+                    <span style={{ fontSize: 13, color: T.inkSoft }}>{label}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <svg width="22" height="10" aria-hidden="true">
+                    <line x1="0" y1="5" x2="22" y2="5" stroke={T.gold} strokeWidth="2" strokeDasharray="4 3" />
+                  </svg>
+                  <span style={{ fontSize: 13, color: T.inkSoft }}>Target</span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={ordered} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={T.line} />
+                  <XAxis dataKey="date" tick={{ fontSize: 13, fill: T.inkMute }}
+                    tickFormatter={(d) => fmtXTick(d, range)} interval={tickCount - 1} />
+                  <YAxis yAxisId="cal" orientation="left" tick={{ fontSize: 13, fill: T.inkMute }} width={40} />
+                  <YAxis yAxisId="grams" orientation="right" tick={{ fontSize: 13, fill: T.inkMute }} width={34} />
+                  <Tooltip
+                    contentStyle={{ fontSize: 13, background: '#fff', border: 'none', borderRadius: 12, boxShadow: T.shadowSoft, color: T.ink }}
+                    labelFormatter={(d) => fmtDayName(d)}
+                  />
+                  <ReferenceLine yAxisId="cal" y={target} stroke={T.gold} strokeDasharray="4 3" />
+                  <Line yAxisId="cal"   dataKey="total_calories"  stroke={T.ink} strokeWidth={2} dot={false} />
+                  <Line yAxisId="grams" dataKey="total_protein_g" stroke={MACRO_COLORS.protein} strokeWidth={1.5} dot={false} strokeDasharray="5 5" />
+                  <Line yAxisId="grams" dataKey="total_carbs_g"   stroke={MACRO_COLORS.carbs}   strokeWidth={1.5} dot={false} strokeDasharray="2 3" />
+                  <Line yAxisId="grams" dataKey="total_fat_g"     stroke={MACRO_COLORS.fat}     strokeWidth={1.5} dot={false} strokeDasharray="8 3 2 3" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Selected day */}
+          {selectedDay && (
+            <section style={{ marginTop: 28 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+                <h2 style={{ fontFamily: T.fontDisplay, fontSize: 22, fontWeight: 'normal', margin: 0 }}>{fmtDayName(selectedDay.date)}</h2>
+                <span style={{ fontSize: 15, color: T.inkMute }}>{Math.round(selectedDay.total_calories).toLocaleString()} kcal</span>
+              </div>
+              {selectedDay.meals.length === 0 && (
+                <div style={{ fontSize: 15, color: T.inkMute, padding: '8px 0' }}>Nothing logged.</div>
+              )}
+              {selectedDay.meals.map((m) => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, borderBottom: `1px solid ${T.line}` }}>
+                  <button onClick={() => setViewingMeal(m)} style={{
+                    flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0',
+                    background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: T.fontBody, color: T.ink,
+                  }}>
+                    <PWPlate src={m.photo_url} name={m.name} size={54} shadow={false} />
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                        fontFamily: T.fontDisplay, fontSize: 18, lineHeight: 1.25,
+                      }}>{m.name}</span>
+                      <span style={{ display: 'block', fontSize: 14, color: T.inkMute, marginTop: 2 }}>
+                        {typeLabel(m.meal_type)}, {new Date(m.created_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: 16, fontWeight: 600, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                      {Math.round(m.calories)}
+                    </span>
+                  </button>
+                  <button onClick={() => setConfirmTarget(m)} aria-label={`Delete ${m.name}`} style={{
+                    width: 44, height: 44, background: 'none', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0,
+                  }}>
+                    {PWIcon2.trash(20, T.danger)}
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
+        </>
+      )}
 
       {/* Meal detail view */}
       <PWMealView
@@ -299,14 +288,7 @@ export default function PWHistory({ onHome, onAddMeal, onLibrary, onBack, onEdit
         onCancel={() => setConfirmTarget(null)}
       />
 
-      {/* Bottom Nav */}
-      <BottomNav
-        active="history"
-        onHome={onHome || onBack}
-        onAdd={onAddMeal}
-        onHistory={undefined}
-        onLibrary={onLibrary}
-      />
+      <PWNav active="history" onToday={onHome || onBack} onHistory={() => {}} onScan={onAddMeal} onLibrary={onLibrary} onYou={onYou} />
     </div>
   );
 }
