@@ -2,9 +2,7 @@ import React, { useRef, useState } from 'react';
 import { T, PWIcon2 } from '../tokens.jsx';
 import PWLeader from './PWLeader.jsx';
 import PWButton from './PWButton.jsx';
-import { stepFor } from '../lib/scaleIngredients.js';
-
-const round2 = (n) => Math.round(n * 100) / 100;
+import { stepFor, nextQty } from '../lib/scaleIngredients.js';
 
 const inputStyle = {
   height: 48, border: 'none', borderRadius: 14, background: '#fff', padding: '0 14px',
@@ -74,19 +72,14 @@ export default function PWIngredients({ ingredients, onScale, onRemove, onUnitCh
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <PWButton variant="primary" onClick={commit} style={{ height: 48, flex: 1, fontSize: 16 }}>Done</PWButton>
                 <PWButton variant="secondary" onClick={() => setEditingIdx(null)} style={{ height: 48, fontSize: 16 }}>Cancel</PWButton>
-                {ingredients.length > 1 && (
-                  <button onClick={() => { setEditingIdx(null); onRemove(idx); }} style={{
-                    minHeight: 48, padding: '0 8px', background: 'none', border: 'none', color: T.danger,
-                    fontSize: 16, fontWeight: 600, fontFamily: T.fontBody, cursor: 'pointer',
-                  }}>Remove</button>
-                )}
               </div>
             </div>
           );
         }
         const step = stepFor(ing.unit, origOf(ing));
-        const down = round2(ing.quantity - step);
-        const up = round2(ing.quantity + step);
+        const q = Number(ing.quantity);
+        const down = nextQty(q, step, -1);
+        const up = nextQty(q, step, +1);
         return (
           <div key={idx} style={{ display: 'flex', alignItems: 'center', borderBottom: `1px solid ${T.line}` }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -98,6 +91,11 @@ export default function PWIngredients({ ingredients, onScale, onRemove, onUnitCh
             <StepButton label={`Increase ${ing.name}`} onClick={() => onScale(idx, up)}>
               {PWIcon2.plus(16, T.ink)}
             </StepButton>
+            {onRemove && ingredients.length > 1 && (
+              <StepButton label={`Remove ${ing.name}`} onClick={() => { setEditingIdx(null); onRemove(idx); }}>
+                {PWIcon2.trash(16, T.danger)}
+              </StepButton>
+            )}
           </div>
         );
       })}

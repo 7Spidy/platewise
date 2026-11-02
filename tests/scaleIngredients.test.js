@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scaleIngredient, removeIngredient, stepFor } from '../client/src/lib/scaleIngredients.js';
+import { scaleIngredient, removeIngredient, stepFor, nextQty } from '../client/src/lib/scaleIngredients.js';
 
 const rice = { name: 'Rice', quantity: 100, unit: 'g', calories: 130, protein_g: 2.5, carbs_g: 28, fat_g: 0.3 };
 const dal = { name: 'Dal', quantity: 200, unit: 'g', calories: 200, protein_g: 14, carbs_g: 30, fat_g: 4, fiber_g: 8, sugar_g: 2, sodium_mg: 400 };
@@ -105,5 +105,40 @@ describe('stepFor', () => {
     expect(stepFor('cup', 1)).toBe(1);
     expect(stepFor('tbsp', 1.5)).toBe(0.5);
     expect(stepFor('tsp', 2)).toBe(1);
+  });
+
+  it('uses 0.25 for cups with a fractional starting quantity', () => {
+    expect(stepFor('cup', 0.75)).toBe(0.25);
+    expect(stepFor('cups', 1.5)).toBe(0.25);
+  });
+});
+
+describe('nextQty', () => {
+  it('snaps off-grid values to the nearest grid line in the direction of travel', () => {
+    expect(nextQty(37, 5, +1)).toBe(40);
+    expect(nextQty(37, 5, -1)).toBe(35);
+  });
+
+  it('moves on-grid values by one full step', () => {
+    expect(nextQty(40, 5, +1)).toBe(45);
+    expect(nextQty(40, 5, -1)).toBe(35);
+    expect(nextQty(150, 10, +1)).toBe(160);
+    expect(nextQty(155, 10, -1)).toBe(150);
+  });
+
+  it('handles fractional steps without float drift', () => {
+    expect(nextQty(0.75, 0.25, -1)).toBe(0.5);
+    expect(nextQty(0.75, 0.25, +1)).toBe(1);
+    expect(nextQty(1.5, 0.5, +1)).toBe(2);
+  });
+
+  it('can reach zero, which the UI treats as a disabled minus', () => {
+    expect(nextQty(3, 5, -1)).toBe(0);
+  });
+
+  it('coerces string input and tolerates NaN', () => {
+    expect(nextQty('37', 5, +1)).toBe(40);
+    expect(() => nextQty(NaN, 5, +1)).not.toThrow();
+    expect(nextQty(NaN, 5, +1)).toBeNaN();
   });
 });

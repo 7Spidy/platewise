@@ -23,13 +23,35 @@ export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgai
   const [logAgainAt, setLogAgainAt]       = useState('');
   const [submitting, setSubmitting]       = useState(false);
   const [logAgainError, setLogAgainError] = useState(null);
+  const [libState, setLibState]           = useState('checking'); // 'checking' | 'idle' | 'saving' | 'saved'
+  const [libError, setLibError]           = useState(null);
 
-  // Reset log-again state whenever the viewed meal changes
+  // Reset per-meal state whenever the viewed meal changes, and check whether the
+  // library already has a meal with this name. A failed check never blocks saving.
   useEffect(() => {
     setLoggingAgain(false);
     setLogAgainAt('');
     setSubmitting(false);
     setLogAgainError(null);
+    setLibError(null);
+    if (!meal) return undefined;
+
+    let cancelled = false;
+    setLibState('checking');
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    (async () => {
+      try {
+        const res = await fetch('/api/saved-meals');
+        if (!res.ok) throw new Error('check failed');
+        const rows = await res.json();
+        if (cancelled) return;
+        const target = norm(meal.name);
+        setLibState(Array.isArray(rows) && rows.some((r) => norm(r.name) === target) ? 'saved' : 'idle');
+      } catch {
+        if (!cancelled) setLibState('idle');
+      }
+    })();
+    return () => { cancelled = true; };
   }, [meal]);
 
   // Escape closes the view
@@ -62,6 +84,39 @@ export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgai
       setSubmitting(false);
     }
   };
+
+  const onSaveToLibrary = async () => {
+    if (libState !== 'idle') return;
+    setLibState('saving');
+    setLibError(null);
+    // Postgres numeric columns can come back as strings; the validator needs real numbers.
+    const num = (v) => (v == null || v === '' ? null : Number(v));
+    try {
+      const res = await fetch('/api/saved-meals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: meal.name,
+          photoUrl: meal.photo_url ?? null,
+          ingredients: Array.isArray(meal.ingredients) ? meal.ingredients : null,
+          calories: Number(meal.calories) || 0,
+          proteinG: num(meal.protein_g), carbsG: num(meal.carbs_g), fatG: num(meal.fat_g),
+          fiberG: num(meal.fiber_g), sodiumMg: num(meal.sodium_mg), sugarG: num(meal.sugar_g),
+        }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error || 'Could not save to library');
+      }
+      setLibState('saved');
+    } catch (e) {
+      setLibError(e.message || 'Could not save to library');
+      setLibState('idle');
+    }
+  };
+
+  const savedNow = libState === 'saved';
+  const saveLabel = savedNow ? 'Saved in library' : 'Save to library';
 
   const when = new Date(meal.created_at);
   const typeLabel = meal.meal_type ? meal.meal_type.charAt(0).toUpperCase() + meal.meal_type.slice(1) : 'Meal';
@@ -188,6 +243,12 @@ export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgai
               {logAgainError}
             </div>
           )}
+
+          {libError && (
+            <div style={{ background: T.dangerTint, color: T.danger, borderRadius: 14, padding: '12px 16px', fontSize: 15 }}>
+              {libError}
+            </div>
+          )}
         </div>
 
         <div style={{ flex: 1 }} />
@@ -195,6 +256,16 @@ export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgai
           {origin === 'history' ? (
             <>
               <PWButton variant="secondary" onClick={onEdit} style={{ flex: 1 }}>Edit</PWButton>
+              <PWButton
+                variant={savedNow ? 'soft' : 'secondary'}
+                onClick={onSaveToLibrary}
+                disabled={libState === 'checking' || savedNow}
+                busy={libState === 'saving'}
+                aria-label={saveLabel}
+                style={{ width: 56, minWidth: 56, padding: 0, flex: '0 0 56px', ...(savedNow ? { opacity: 1 } : null) }}
+              >
+                {savedNow ? PWIcon2.check(20, T.sage) : PWIcon2.bookmark(20, T.ink)}
+              </PWButton>
               {!loggingAgain && (
                 <PWButton variant="primary" style={{ flex: 1.5 }}
                   onClick={() => { setLoggingAgain(true); setLogAgainAt(toLocalInputValue(new Date())); }}>
@@ -203,7 +274,19 @@ export default function PWMealView({ meal, onClose, onEdit, origin, onLoggedAgai
               )}
             </>
           ) : (
-            <PWButton variant="primary" onClick={onEdit} style={{ width: '100%' }}>Edit</PWButton>
+            <>
+              <PWButton variant="secondary" onClick={onEdit} style={{ flex: 1 }}>Edit</PWButton>
+              <PWButton
+                variant={savedNow ? 'soft' : 'primary'}
+                onClick={onSaveToLibrary}
+                disabled={libState === 'checking' || savedNow}
+                busy={libState === 'saving'}
+                aria-label={saveLabel}
+                style={{ flex: 1, padding: '0 16px', whiteSpace: 'nowrap', ...(savedNow ? { opacity: 1 } : null) }}
+              >
+                {savedNow ? <>{PWIcon2.check(18, T.sage)} Saved</> : <>{PWIcon2.bookmark(18, T.onAccent)} Save</>}
+              </PWButton>
+            </>
           )}
         </PWActionBar>
       </div>

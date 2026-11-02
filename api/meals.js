@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       name, serving, calories,
       macros = {}, other = {}, ingredients,
       healthScore, fact, tips, mismatch, mealType,
-      imageBase64, mimeType, loggedAt,
+      imageBase64, mimeType, loggedAt, photoUrl: requestedPhotoUrl,
     } = req.body || {};
 
     const payloadErrors = validateMealWritePayload({ name, calories, ingredients });
@@ -60,6 +60,19 @@ export default async function handler(req, res) {
         photoUrl = await uploadMealPhoto(imageBase64, mimeType || 'image/jpeg');
       } catch (err) {
         console.error('Blob upload failed:', err);
+      }
+    }
+
+    // Quick-add passes the saved meal's photo. Only accept a URL that belongs to one of
+    // this user's saved meals; anything else is ignored and the meal logs without a photo.
+    if (!photoUrl && typeof requestedPhotoUrl === 'string' && requestedPhotoUrl) {
+      try {
+        const { rows: owned } = await sql`
+          select 1 from saved_meals
+          where user_id = ${req.user.id} and photo_url = ${requestedPhotoUrl} limit 1`;
+        if (owned.length > 0) photoUrl = requestedPhotoUrl;
+      } catch (err) {
+        console.error('photoUrl ownership check failed:', err);
       }
     }
 
@@ -144,10 +157,13 @@ export default async function handler(req, res) {
 
       await sql`delete from meal_logs where id = ${id} and user_id = ${req.user.id}`;
 
-      // Delete blob only if not referenced by a saved meal
+      // Delete blob only if not referenced by a saved meal or another meal log
+      // (log-again and quick-add both reuse photo_url). The deleted row is already gone,
+      // so any match in meal_logs is a real other reference.
       if (photoUrl) {
         const { rows: saved } = await sql`select 1 from saved_meals where photo_url = ${photoUrl} limit 1`;
-        if (saved.length === 0) {
+        const { rows: otherLogs } = await sql`select 1 from meal_logs where photo_url = ${photoUrl} limit 1`;
+        if (saved.length === 0 && otherLogs.length === 0) {
           await deleteMealPhoto(photoUrl);
         }
       }

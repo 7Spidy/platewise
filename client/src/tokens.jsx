@@ -93,7 +93,12 @@ export function compressImage(file, maxPx = 600) {
 }
 
 export const PWIcon2 = {
-  check: (size = 18, color = T.sage) => (
+  bookmark: (size = 20, color = T.ink) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M6.5 4h11v16l-5.5-3.8L6.5 20V4z" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  check:(size = 18, color = T.sage) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <path d="M5 12.5l4.5 4.5L19 7.5" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>

@@ -72,5 +72,18 @@ export function stepFor(unit, originalQty) {
     return 25;
   }
   if ((u === 'tsp' || u === 'tbsp') && Number.isFinite(q) && q % 1 !== 0) return 0.5;
+  if ((u === 'cup' || u === 'cups') && Number.isFinite(q) && q % 1 !== 0) return 0.25;
   return 1;
+}
+
+const EPS = 1e-9;
+// Next value on the step grid. Off-grid values snap to the nearest grid line in the
+// direction of travel: 37 (step 5) -> up 40, down 35. On-grid values move one full step.
+export function nextQty(qty, step, dir) {
+  const q = Number(qty);
+  const s = Number(step);
+  if (!Number.isFinite(q) || !Number.isFinite(s) || s <= 0) return q;
+  const units = q / s;
+  const n = dir > 0 ? Math.floor(units + EPS) + 1 : Math.ceil(units - EPS) - 1;
+  return Math.round(n * s * 100) / 100;
 }

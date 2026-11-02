@@ -22,6 +22,7 @@ export async function logSavedMeal(saved) {
       macros:  { carbs: saved.carbs_g, protein: saved.protein_g, fat: saved.fat_g },
       other:   { fiber: saved.fiber_g, sugar: saved.sugar_g, sodium: saved.sodium_mg },
       ingredients: saved.ingredients,
+      photoUrl: saved.photo_url ?? null,
       mealType: detectMealType(),
     }),
   });

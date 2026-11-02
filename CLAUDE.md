@@ -113,6 +113,16 @@ Response (validated server-side — 502 if shape is wrong):
 - [ ] **Log again hidden on Dashboard** — open a meal from the Dashboard's "today" list and confirm no "Log again" button appears in the detail view, only Edit/Close.
 - [ ] **Log again removed from Edit screen** — open Edit on any meal and confirm there is no "Log again" button in the header; only back button and title.
 - [ ] **Log again error handling** — simulate a failed `/api/log-again` call (e.g. temporarily break the endpoint or disconnect network) and confirm the modal stays open with an error message instead of silently failing or closing.
+- [ ] **Save from Dashboard meal.** Open a meal from today and tap Save. The button turns to "Saved" and the meal appears in Library with its photo.
+- [ ] **Save from History meal.** The bookmark square saves, then shows a check. Edit and Log again still work.
+- [ ] **Duplicate guard.** Open a meal whose name already exists in Library. The button opens in the "Saved" state.
+- [ ] **Library check fails.** Block `/api/saved-meals` GET. The button still becomes tappable.
+- [ ] **Quick-add photo.** Quick-add a library meal that has a photo. The new log shows the photo.
+- [ ] **Shared photo survives delete.** Log a meal with a photo, Log again it, then delete the original. The copy still shows the photo.
+- [ ] **Row trash on Edit and Review.** Each row has a trash icon and totals drop by that ingredient. A single-ingredient meal shows no trash.
+- [ ] **Snapping.** An ingredient at 37g goes to 40 with +, or 35 with −, then moves in steps of 5.
+- [ ] **Fractional cup.** 0.75 cup goes to 0.5 with − and 1 with +, and minus is not dead.
+- [ ] **360px width.** Long ingredient names truncate and all three row buttons stay visible and tappable.
 
 ## Commit style
 ```
