@@ -6,24 +6,17 @@ export function detectMealType() {
   return 'dinner';
 }
 
-// Logs a saved-library meal as a new entry. Throws on network failure; callers
-// handle errors and refresh their own data afterwards.
+// Logs a saved-library meal as a new entry via one atomic server call (the server
+// inserts the meal_logs row and bumps use_count together, or does neither).
+// Throws Error(message) on any non-2xx or network failure.
 export async function logSavedMeal(saved) {
-  await fetch('/api/saved-meals', {
+  const res = await fetch('/api/saved-meals', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: saved.id, bumpUse: true }),
+    body: JSON.stringify({ id: saved.id, log: true, mealType: detectMealType() }),
   });
-  await fetch('/api/meals', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: saved.name, calories: saved.calories,
-      macros:  { carbs: saved.carbs_g, protein: saved.protein_g, fat: saved.fat_g },
-      other:   { fiber: saved.fiber_g, sugar: saved.sugar_g, sodium: saved.sodium_mg },
-      ingredients: saved.ingredients,
-      photoUrl: saved.photo_url ?? null,
-      mealType: detectMealType(),
-    }),
-  });
+  if (!res.ok) {
+    throw new Error('Could not log that meal');
+  }
+  return res.json();
 }

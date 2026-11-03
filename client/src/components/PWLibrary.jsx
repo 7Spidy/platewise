@@ -79,8 +79,8 @@ export default function PWLibrary({ onHome, onAddMeal, onHistory, onBack, onYou 
       await logSavedMeal(m);
       showToast('Logged');
       await load();
-    } catch {
-      setError('Could not log that meal');
+    } catch (e) {
+      setError(e.message || 'Could not log that meal');
     } finally {
       setBusyId(null);
     }

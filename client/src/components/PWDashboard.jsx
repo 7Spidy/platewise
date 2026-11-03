@@ -87,12 +87,13 @@ export default function PWDashboard({ onAddMeal, onHistory, onLibrary, onYou, on
 
   const onQuickAdd = async (saved) => {
     if (isReadOnly) return;
+    setError(null);
     setBusyChip(saved.id);
     try {
       await logSavedMeal(saved);
       await load();
-    } catch {
-      setError('Could not log that item');
+    } catch (e) {
+      setError(e.message || 'Could not log that item');
     } finally {
       setBusyChip(null);
     }

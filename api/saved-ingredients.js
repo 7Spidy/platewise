@@ -1,6 +1,7 @@
 // api/saved-ingredients.js
 import { sql } from '@vercel/postgres';
 import { requireAuth } from '../lib/auth.js';
+import { numifyRow, SAVED_NUMERIC_KEYS } from '../lib/normalize.js';
 
 export default async function handler(req, res) {
   if (!requireAuth(req, res)) return;
@@ -8,7 +9,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const { rows } = await sql`select * from saved_ingredients where user_id = ${req.user.id} order by name asc`;
-      return res.status(200).json(rows);
+      return res.status(200).json(rows.map((r) => numifyRow(r, SAVED_NUMERIC_KEYS)));
     } catch (err) {
       console.error('GET /api/saved-ingredients failed:', err);
       return res.status(500).json({ error: 'Something went wrong, please try again' });
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
            ${fiberG ?? 0}, ${sodiumMg ?? 0}, ${sugarG ?? 0})
         returning *
       `;
-      return res.status(201).json(rows[0]);
+      return res.status(201).json(numifyRow(rows[0], SAVED_NUMERIC_KEYS));
     } catch (err) {
       console.error('POST /api/saved-ingredients failed:', err);
       return res.status(500).json({ error: 'Something went wrong, please try again' });
@@ -50,7 +51,7 @@ export default async function handler(req, res) {
         returning *
       `;
       if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-      return res.status(200).json(rows[0]);
+      return res.status(200).json(numifyRow(rows[0], SAVED_NUMERIC_KEYS));
     } catch (err) {
       console.error('PATCH /api/saved-ingredients failed:', err);
       return res.status(500).json({ error: 'Something went wrong, please try again' });
